@@ -401,7 +401,7 @@
           log(`  refreshed: ${timeAgo(LIVE.generatedAt)}`);
         } else {
           log("◉ SIM — curated reference values; no live research yet");
-          log("  run: node scripts/update-signals.mjs (needs ANTHROPIC_API_KEY)");
+          log("  run: node scripts/update-signals.mjs (needs OPENAI_API_KEY)");
         }
         break;
       case "list":

@@ -10,6 +10,6 @@
     "test": "node betatest.cjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.69.0"
+    "openai": "^6.10.0"
   }
 }

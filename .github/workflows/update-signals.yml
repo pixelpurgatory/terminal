@@ -1,11 +1,12 @@
 name: Update signals (AI research)
 
-# Runs the in-repo research agent twice a day. It calls Claude with web search,
+# Runs the in-repo research agent twice a day. It calls OpenAI with web search,
 # refreshes js/live-data.js + data/live.json, and commits the result so the
 # terminal serves fresh, AI-researched signals.
 #
 # Requirements:
-#   - Repo secret ANTHROPIC_API_KEY (Settings → Secrets and variables → Actions).
+#   - Repo secret `matrix` holding an OpenAI API key (Settings → Secrets and
+#     variables → Actions). It is exposed to the script as OPENAI_API_KEY below.
 #   - For the *scheduled* runs to fire, this workflow must exist on the repo's
 #     DEFAULT branch (GitHub only schedules workflows from the default branch).
 #     You can always trigger it manually on any branch via "Run workflow".
@@ -38,7 +39,7 @@ jobs:
 
       - name: Research latest signals
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.matrix }}
         run: node scripts/update-signals.mjs
 
       - name: Commit refreshed data

@@ -1,17 +1,17 @@
 /* =============================================================================
  *  MATRIX TERMINAL  ·  SELF-UPDATING SIGNAL RESEARCHER
  *  -----------------------------------------------------------------------------
- *  Runs on a schedule (GitHub Actions, twice a day). Uses Claude with the
- *  web_search tool to research current values for each thesis signal defined in
- *  js/data.js, then writes js/live-data.js (loaded by the terminal) and
- *  data/live.json (a human-readable record).
+ *  Runs on a schedule (GitHub Actions, twice a day). Uses OpenAI (Responses API
+ *  with the web_search tool) to research current values for each thesis signal
+ *  defined in js/data.js, then writes js/live-data.js (loaded by the terminal)
+ *  and data/live.json (a human-readable record).
  *
  *  The curated model in js/data.js is the single source of truth for WHICH
  *  signals exist; this script refreshes their VALUES. Anything the model can't
  *  confidently find is left out and the UI falls back to the curated value.
  *
  *  Usage:
- *    node scripts/update-signals.mjs            # live: needs ANTHROPIC_API_KEY
+ *    node scripts/update-signals.mjs            # live: needs OPENAI_API_KEY
  *    node scripts/update-signals.mjs --dry-run  # offline: synthesizes mock data
  * ===========================================================================*/
 
@@ -35,7 +35,7 @@ function loadCuratedModel() {
 const { STOCKS, STOCK_ORDER } = loadCuratedModel();
 
 const DRY_RUN = process.argv.includes("--dry-run");
-const MODEL = process.env.SIGNAL_MODEL || "claude-opus-4-8";
+const MODEL = process.env.SIGNAL_MODEL || "gpt-5.5";
 
 const TRENDS = new Set(["up", "down", "flat"]);
 const STANCES = new Set(["bull", "bear", "neutral"]);
@@ -153,34 +153,19 @@ function validate(raw) {
   return out;
 }
 
-/* ---------- Live research via Claude + web_search ---------- */
+/* ---------- Live research via OpenAI Responses API + web_search ---------- */
 async function research() {
-  const { default: Anthropic } = await import("@anthropic-ai/sdk");
-  const client = new Anthropic({ timeout: 600000 }); // 10 min — web search loops are slow
+  const { default: OpenAI } = await import("openai");
+  const client = new OpenAI({ timeout: 600000 }); // 10 min — web search loops are slow
 
-  const spec = buildSpec();
-  const messages = [{ role: "user", content: buildPrompt(spec) }];
-  const tools = [{ type: "web_search_20260209", name: "web_search", max_uses: 40 }];
+  const response = await client.responses.create({
+    model: MODEL,
+    tools: [{ type: "web_search" }],
+    max_output_tokens: 16000,
+    input: buildPrompt(buildSpec()),
+  });
 
-  let response;
-  for (let i = 0; i < 8; i++) {
-    response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 16000,
-      thinking: { type: "adaptive" },
-      tools,
-      messages,
-    });
-    if (response.stop_reason !== "pause_turn") break;
-    // Server tool hit its iteration cap — re-send to let it continue.
-    messages.push({ role: "assistant", content: response.content });
-  }
-
-  const text = response.content
-    .filter((b) => b.type === "text")
-    .map((b) => b.text)
-    .join("\n")
-    .trim();
+  const text = (response.output_text || "").trim();
   if (!text) throw new Error("Model returned no text output");
   return validate(extractJson(text));
 }
@@ -243,8 +228,8 @@ function writeOutputs(stocks) {
       writeOutputs(mock());
       return;
     }
-    if (!process.env.ANTHROPIC_API_KEY) {
-      console.error("ANTHROPIC_API_KEY is not set. Use --dry-run to test offline.");
+    if (!process.env.OPENAI_API_KEY) {
+      console.error("OPENAI_API_KEY is not set. Use --dry-run to test offline.");
       process.exit(1);
     }
     const stocks = await research();

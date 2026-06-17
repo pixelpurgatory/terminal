@@ -64,16 +64,16 @@ python3 -m http.server 8080   # then visit http://localhost:8080
 ## Self-updating AI feed
 
 The terminal can refresh its own signals. A research agent lives in the repo and
-runs **twice a day** (GitHub Actions cron): it calls **Claude (`claude-opus-4-8`)
-with web search**, looks up the latest real-world value for every signal defined
-in `js/data.js`, and commits the result to `js/live-data.js`. The terminal loads
+runs **twice a day** (GitHub Actions cron): it calls **OpenAI (`gpt-5.5`,
+Responses API) with web search**, looks up the latest real-world value for every
+signal defined in `js/data.js`, and commits the result to `js/live-data.js`. The terminal loads
 that file and overlays it — the feed chip flips to **`◉ LIVE`** with a timestamp,
 and each name gets an **AI READ** summary line with source links. When no live
 data is present, it falls back to the curated values (`◉ SIM FEED`).
 
 ```
 GitHub Actions (cron, 2×/day)
-   └─ node scripts/update-signals.mjs        # Claude + web_search
+   └─ node scripts/update-signals.mjs        # OpenAI + web_search
         └─ writes js/live-data.js + data/live.json, commits them
              └─ the terminal loads js/live-data.js and overlays the values
 ```
@@ -84,7 +84,8 @@ left out (the UI keeps the curated fallback).
 
 ### Enabling it
 
-1. Add a repo secret **`ANTHROPIC_API_KEY`** (Settings → Secrets and variables → Actions).
+1. Add a repo secret named **`matrix`** holding an **OpenAI API key** (Settings →
+   Secrets and variables → Actions). The workflow exposes it to the script as `OPENAI_API_KEY`.
 2. For the *scheduled* runs to fire, the workflow must live on the repo's
    **default branch** (GitHub only schedules from there). You can also trigger it
    anytime via **Actions → "Update signals" → Run workflow**.
@@ -93,8 +94,8 @@ left out (the UI keeps the curated fallback).
 
 ```bash
 npm install
-ANTHROPIC_API_KEY=sk-ant-... npm run update     # real research via Claude + web search
-npm run update:dry                              # offline: synthesizes a mock feed (◉ DEMO)
+OPENAI_API_KEY=sk-... npm run update     # real research via OpenAI + web search
+npm run update:dry                       # offline: synthesizes a mock feed (◉ DEMO)
 ```
 
 Type `feed` in the terminal's command line to see the current source, model, and
