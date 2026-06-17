@@ -35,7 +35,7 @@ function loadCuratedModel() {
 const { STOCKS, STOCK_ORDER } = loadCuratedModel();
 
 const DRY_RUN = process.argv.includes("--dry-run");
-const MODEL = process.env.SIGNAL_MODEL || "gpt-5.5";
+const MODEL = process.env.SIGNAL_MODEL || "gpt-4.1";
 
 const TRENDS = new Set(["up", "down", "flat"]);
 const STANCES = new Set(["bull", "bear", "neutral"]);
