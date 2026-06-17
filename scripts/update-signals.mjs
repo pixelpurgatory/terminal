@@ -83,8 +83,10 @@ ${JSON.stringify(spec, null, 2)}
 For every signal, return:
   value   - the current reading as a short display string WITH units (e.g. "$462B", "+34% YoY", "42.1%", "118 bps")
   delta   - period-over-period change as a short string (e.g. "+9pp QoQ", "-280bps YoY"); "" if unknown
-  trend   - one of: "up" | "down" | "flat"  (direction the metric moved)
-  stance  - one of: "bull" | "bear" | "neutral"  (what the CURRENT reading implies for the bull thesis on that name)
+  trend   - one of: "up" | "down" | "flat"  (the direction the metric itself moved)
+  stance  - one of: "bull" | "bear" | "neutral"  (REQUIRED — what the CURRENT verified reading
+            implies for the BULL thesis on that name: "bull" supports it, "bear" undercuts it,
+            "neutral" if mixed or roughly in line. Judge each signal independently.)
   raw     - integer 0-100 expressing how strong/elevated the reading is (for a gauge fill)
   note    - one concise sentence on what this reading means for the thesis right now
 
@@ -94,6 +96,12 @@ Also return per ticker:
   asOf      - the date your figures reflect, ISO "YYYY-MM-DD"
   summary  - one sentence: your current read on the name
   sources  - array of 1-4 source URLs you relied on
+
+Precision (important):
+- Check EACH signal individually. Verify its current figure from a real, recent source
+  (earnings release, filing, IR deck, reputable finance site) before reporting it — do not
+  approximate from memory or reuse an old number.
+- Assign "stance" per signal from its verified reading, not from the overall vibe on the name.
 
 Coverage (important):
 - Make a genuine effort to find EVERY signal listed for each ticker via search.

@@ -167,11 +167,16 @@
       const c = stanceColor(g.stance);
       const arrow = g.trend === "up" ? "▲" : g.trend === "down" ? "▼" : "■";
       const dots = "●".repeat(g.weight) + "○".repeat(3 - g.weight);
+      const stanceLabel = g.stance === "bull" ? "BULLISH"
+        : g.stance === "bear" ? "BEARISH" : "NEUTRAL";
       return `
         <article class="card ${g.stance}" tabindex="0">
           <header class="card-h">
             <span class="card-label">${esc(g.label)}</span>
-            <span class="card-weight" title="thesis weight">${dots}</span>
+            <span class="card-tags">
+              <span class="card-stance ${g.stance}" title="impact on the bull thesis">${stanceLabel}</span>
+              <span class="card-weight" title="thesis weight">${dots}</span>
+            </span>
           </header>
           <div class="card-val">
             <span class="card-value">${esc(g.value)}</span>

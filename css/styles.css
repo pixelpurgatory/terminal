@@ -256,8 +256,13 @@ body {
   box-shadow: 0 6px 20px rgba(0,0,0,.4), inset 0 0 20px rgba(0,255,102,.06);
   outline: none;
 }
-.card-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.card-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .card-label { font-size: 11px; color: var(--ink-dim); letter-spacing: .5px; }
+.card-tags { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.card-stance { font-size: 8.5px; letter-spacing: .5px; padding: 1px 5px; border-radius: 2px; font-weight: 700; }
+.card-stance.bull { color: var(--bg); background: var(--green); box-shadow: 0 0 6px rgba(0,255,102,.5); }
+.card-stance.bear { color: #fff; background: var(--red); box-shadow: 0 0 6px rgba(255,59,92,.5); }
+.card-stance.neutral { color: var(--bg); background: var(--amber); box-shadow: 0 0 6px rgba(255,204,51,.5); }
 .card-weight { font-size: 9px; color: var(--green-d); letter-spacing: 1px; }
 .card-val { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 4px 0 2px; }
 .card-value { font-size: 22px; color: var(--white); font-weight: 700; text-shadow: var(--glow); font-variant-numeric: tabular-nums; }
