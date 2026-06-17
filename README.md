@@ -47,13 +47,53 @@ open index.html        # macOS  (xdg-open on Linux)
 python3 -m http.server 8080   # then visit http://localhost:8080
 ```
 
+## Self-updating AI feed
+
+The terminal can refresh its own signals. A research agent lives in the repo and
+runs **twice a day** (GitHub Actions cron): it calls **Claude (`claude-opus-4-8`)
+with web search**, looks up the latest real-world value for every signal defined
+in `js/data.js`, and commits the result to `js/live-data.js`. The terminal loads
+that file and overlays it — the feed chip flips to **`◉ LIVE`** with a timestamp,
+and each name gets an **AI READ** summary line with source links. When no live
+data is present, it falls back to the curated values (`◉ SIM FEED`).
+
+```
+GitHub Actions (cron, 2×/day)
+   └─ node scripts/update-signals.mjs        # Claude + web_search
+        └─ writes js/live-data.js + data/live.json, commits them
+             └─ the terminal loads js/live-data.js and overlays the values
+```
+
+`js/data.js` stays the single source of truth for *which* signals exist; the
+agent only refreshes their *values*, and anything it can't confidently find is
+left out (the UI keeps the curated fallback).
+
+### Enabling it
+
+1. Add a repo secret **`ANTHROPIC_API_KEY`** (Settings → Secrets and variables → Actions).
+2. For the *scheduled* runs to fire, the workflow must live on the repo's
+   **default branch** (GitHub only schedules from there). You can also trigger it
+   anytime via **Actions → "Update signals" → Run workflow**.
+
+### Running the researcher locally
+
+```bash
+npm install
+ANTHROPIC_API_KEY=sk-ant-... npm run update     # real research via Claude + web search
+npm run update:dry                              # offline: synthesizes a mock feed (◉ DEMO)
+```
+
+Type `feed` in the terminal's command line to see the current source, model, and
+refresh time.
+
 ## Data honesty
 
-There is **no live market feed** here. Intraday prices are a *simulated tape*
-(clearly marked `◉ SIM FEED`), and the structural signals are **hand-curated
-reference values** calibrated to each name's 2025–2026 narrative — a realistic
-demo of the terminal, not investment data. Edit `js/data.js` to wire in real
-numbers; the UI renders entirely from that file.
+Intraday **prices are always a simulated tape** — there is no real-time quote
+feed wired in. The **structural signals** are either AI-researched (`◉ LIVE`,
+when the agent has run) or hand-curated reference values (`◉ SIM FEED`)
+calibrated to each name's 2025–2026 narrative. The `◉ DEMO` chip means the
+offline dry-run mock is loaded (a pipeline test, not real research). Everything
+renders from `js/data.js` + `js/live-data.js`.
 
 ## Beta test
 
@@ -61,5 +101,5 @@ A headless Playwright smoke test drives the real page (boot, switching,
 commands, sparkline sizing) and fails on any console/page error:
 
 ```bash
-node betatest.js
+npm install && node betatest.cjs   # or: npm test
 ```

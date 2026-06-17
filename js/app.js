@@ -10,6 +10,33 @@
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
+  // Live research overlay (written by scripts/update-signals.mjs). May be null.
+  const LIVE = (window.LIVE_SIGNALS && window.LIVE_SIGNALS.stocks) ? window.LIVE_SIGNALS : null;
+  const liveStock = (sym) => (LIVE && LIVE.stocks[sym]) || null;
+
+  // Merge researched values onto the curated model in place, before anything
+  // reads from STOCKS. Missing fields keep their curated fallback.
+  (function applyLiveData() {
+    if (!LIVE) return;
+    for (const sym of STOCK_ORDER) {
+      const ls = LIVE.stocks[sym];
+      if (!ls) continue;
+      const s = STOCKS[sym];
+      if (Number.isFinite(ls.price)) s.price = ls.price;
+      for (const g of s.signals) {
+        const lv = ls.signals && ls.signals[g.key];
+        if (!lv) continue;
+        if (lv.value) g.value = lv.value;
+        if (typeof lv.delta === "string") g.delta = lv.delta;
+        if (lv.trend) g.trend = lv.trend;
+        if (lv.stance) g.stance = lv.stance;
+        if (Number.isFinite(lv.raw)) g.raw = lv.raw;
+        if (lv.note) g.note = lv.note;
+        g._live = true;
+      }
+    }
+  })();
+
   // Live simulated state per ticker (price, prevClose, history).
   const live = {};
   let current = STOCK_ORDER[0];
@@ -29,6 +56,27 @@
   /* ---------- Formatting helpers ---------- */
   const fmt = (n) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const signed = (n, d = 2) => (n >= 0 ? "+" : "") + n.toFixed(d);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  function timeAgo(iso) {
+    const t = Date.parse(iso);
+    if (!Number.isFinite(t)) return "";
+    const mins = Math.max(0, Math.round((Date.now() - t) / 60000));
+    if (mins < 60) return mins + "m ago";
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return hrs + "h ago";
+    return Math.round(hrs / 24) + "d ago";
+  }
+
+  // Feed status chip: LIVE (researched), DEMO (dry-run mock), or SIM (curated).
+  function feedBadge() {
+    if (LIVE && LIVE.mode === "live")
+      return `<span class="sim-badge live" title="Signals researched by AI; refreshed twice daily. Prices simulated intraday.">◉ LIVE · ${timeAgo(LIVE.generatedAt)}</span>`;
+    if (LIVE && LIVE.mode === "mock")
+      return `<span class="sim-badge demo" title="Dry-run mock data — pipeline demo, not researched.">◉ DEMO · ${timeAgo(LIVE.generatedAt)}</span>`;
+    return `<span class="sim-badge" title="Prices simulated; structural signals are curated reference values.">◉ SIM FEED</span>`;
+  }
 
   /* ---------- Verdict engine ---------- */
   // Weighted bull/bear score from a stock's signals -> -100..+100 + label.
@@ -138,6 +186,18 @@
     const s = STOCKS[sym];
     const v = verdict(sym);
     const root = $("#detail");
+    const ls = liveStock(sym);
+
+    const aiReadHTML = (ls && ls.summary) ? `
+      <div class="ai-read">
+        <span class="ai-tag">AI READ</span>
+        <span class="ai-text">${esc(ls.summary)}</span>
+        ${ls.asOf ? `<span class="ai-asof">as of ${esc(ls.asOf)}</span>` : ""}
+        ${(ls.sources && ls.sources.length) ? `<span class="ai-src">${
+          ls.sources.map((u, i) =>
+            `<a href="${esc(u)}" target="_blank" rel="noopener">[${i + 1}]</a>`).join(" ")
+        }</span>` : ""}
+      </div>` : "";
 
     const groups = {};
     s.signals.forEach((g) => { (groups[g.group] ||= []).push(g); });
@@ -197,6 +257,7 @@
             <span class="verdict-val ${v.cls}">${v.label} · ${signed(v.pct,0)}</span>
           </div>
         </div>
+        ${aiReadHTML}
       </div>
 
       ${groupOrder.map((gname) => `
@@ -208,7 +269,7 @@
         </section>`).join("")}
 
       <footer class="dt-foot">
-        <span class="sim-badge" title="Prices are simulated; structural signals are curated reference values.">◉ SIM FEED</span>
+        ${feedBadge()}
         <span>Signals weighted by thesis impact · ●●● = high</span>
       </footer>
     `;
@@ -326,8 +387,22 @@
     switch (cmd) {
       case "help":
       case "?":
-        log("commands: <TICKER> | list | thesis | next | prev | top | help | clear");
+        log("commands: <TICKER> | list | thesis | feed | next | prev | top | help | clear");
         log("tickers: " + STOCK_ORDER.join(" · "));
+        break;
+      case "feed":
+        if (LIVE && LIVE.mode === "live") {
+          log(`◉ LIVE — AI-researched signals`);
+          log(`  model: ${LIVE.model}`);
+          log(`  refreshed: ${timeAgo(LIVE.generatedAt)} (${LIVE.generatedAt})`);
+          log(`  ${Object.keys(LIVE.stocks).length}/${STOCK_ORDER.length} tickers updated`);
+        } else if (LIVE && LIVE.mode === "mock") {
+          log("◉ DEMO — dry-run mock data (not researched)");
+          log(`  refreshed: ${timeAgo(LIVE.generatedAt)}`);
+        } else {
+          log("◉ SIM — curated reference values; no live research yet");
+          log("  run: node scripts/update-signals.mjs (needs ANTHROPIC_API_KEY)");
+        }
         break;
       case "list":
         STOCK_ORDER.forEach((s) => {
@@ -418,9 +493,17 @@
   /* ---------- Init ---------- */
   function init() {
     buildWatchlist();
+    const rf = $(".rail-foot");
+    if (rf) rf.innerHTML = feedBadge();
     selectStock(current);
     updateClock();
     log("matrix terminal ready. type 'help' or click a ticker.");
+    if (LIVE && LIVE.mode === "live")
+      log(`◉ live AI feed · refreshed ${timeAgo(LIVE.generatedAt)} via ${LIVE.model}`);
+    else if (LIVE && LIVE.mode === "mock")
+      log("◉ demo feed (dry-run mock) · run the researcher for live data");
+    else
+      log("◉ sim feed · curated reference values (no live research yet)");
 
     setInterval(tick, 1200);
     setInterval(updateClock, 1000);

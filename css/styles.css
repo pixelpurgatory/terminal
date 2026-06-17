@@ -274,6 +274,22 @@ body {
   color: var(--ink-dim); font-size: 10px; flex-wrap: wrap; gap: 8px;
 }
 .sim-badge { color: var(--amber); border: 1px solid rgba(255,204,51,.4); padding: 2px 7px; border-radius: 3px; font-size: 10px; letter-spacing: 1px; }
+.sim-badge.live { color: var(--green); border-color: var(--green-dd); text-shadow: var(--glow); animation: pulse 2s infinite; }
+.sim-badge.demo { color: #00cfff; border-color: rgba(0,207,255,.4); }
+
+/* ----- AI read (live research summary) ----- */
+.ai-read {
+  margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--green-dd);
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 12px;
+}
+.ai-tag {
+  font-size: 9px; letter-spacing: 1.5px; color: var(--bg); background: var(--green);
+  padding: 1px 6px; border-radius: 2px; font-weight: 700; box-shadow: var(--glow);
+}
+.ai-text { color: var(--ink); flex: 1; min-width: 200px; }
+.ai-asof { color: var(--ink-dim); font-size: 10px; }
+.ai-src a { color: var(--green-d); text-decoration: none; }
+.ai-src a:hover { color: var(--green); text-shadow: var(--glow); }
 
 /* ----- Glitch on ticker symbol ----- */
 .glitch { position: relative; }

@@ -1,0 +1,15 @@
+{
+  "name": "matrix-stocks-terminal",
+  "version": "1.0.0",
+  "description": "Matrix-style equity signal terminal with a self-updating AI research agent.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "update": "node scripts/update-signals.mjs",
+    "update:dry": "node scripts/update-signals.mjs --dry-run",
+    "test": "node betatest.cjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.69.0"
+  }
+}

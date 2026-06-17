@@ -1,0 +1,54 @@
+name: Update signals (AI research)
+
+# Runs the in-repo research agent twice a day. It calls Claude with web search,
+# refreshes js/live-data.js + data/live.json, and commits the result so the
+# terminal serves fresh, AI-researched signals.
+#
+# Requirements:
+#   - Repo secret ANTHROPIC_API_KEY (Settings → Secrets and variables → Actions).
+#   - For the *scheduled* runs to fire, this workflow must exist on the repo's
+#     DEFAULT branch (GitHub only schedules workflows from the default branch).
+#     You can always trigger it manually on any branch via "Run workflow".
+
+on:
+  schedule:
+    - cron: "0 11 * * 1-5"   # ~06:00 ET, before the US open (weekdays)
+    - cron: "0 22 * * 1-5"   # ~17:00 ET, after the US close (weekdays)
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-signals
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Research latest signals
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: node scripts/update-signals.mjs
+
+      - name: Commit refreshed data
+        run: |
+          git config user.name "matrix-signal-bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add js/live-data.js data/live.json
+          if git diff --staged --quiet; then
+            echo "No signal changes to commit."
+          else
+            git commit -m "chore: refresh live signals [skip ci]"
+            git push
+          fi
