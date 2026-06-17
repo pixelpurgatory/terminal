@@ -35,7 +35,10 @@ function loadCuratedModel() {
 const { STOCKS, STOCK_ORDER } = loadCuratedModel();
 
 const DRY_RUN = process.argv.includes("--dry-run");
-const MODEL = process.env.SIGNAL_MODEL || "gpt-4.1";
+// Models that support the Responses API web_search tool, tried in order.
+// Override with SIGNAL_MODEL to pin one your OpenAI project has access to.
+const WEB_SEARCH_MODELS = ["gpt-5.5", "gpt-4.1", "gpt-4.1-mini"];
+let usedModel = process.env.SIGNAL_MODEL || WEB_SEARCH_MODELS[0];
 
 const TRENDS = new Set(["up", "down", "flat"]);
 const STANCES = new Set(["bull", "bear", "neutral"]);
@@ -154,20 +157,48 @@ function validate(raw) {
 }
 
 /* ---------- Live research via OpenAI Responses API + web_search ---------- */
+const isAccessError = (msg) =>
+  /does not have access|model.*not found|unknown model|no such model|\b40[34]\b/i.test(msg);
+
 async function research() {
   const { default: OpenAI } = await import("openai");
   const client = new OpenAI({ timeout: 600000 }); // 10 min — web search loops are slow
+  const input = buildPrompt(buildSpec());
+  const candidates = process.env.SIGNAL_MODEL ? [process.env.SIGNAL_MODEL] : WEB_SEARCH_MODELS;
 
-  const response = await client.responses.create({
-    model: MODEL,
-    tools: [{ type: "web_search" }],
-    max_output_tokens: 16000,
-    input: buildPrompt(buildSpec()),
-  });
+  for (const model of candidates) {
+    try {
+      const response = await client.responses.create({
+        model,
+        tools: [{ type: "web_search" }],
+        max_output_tokens: 16000,
+        input,
+      });
+      const text = (response.output_text || "").trim();
+      if (!text) throw new Error("model returned empty output");
+      usedModel = model;
+      console.log(`Researched with model: ${model}`);
+      return validate(extractJson(text));
+    } catch (err) {
+      const msg = err?.message || String(err);
+      if (isAccessError(msg)) {
+        console.warn(`Model "${model}" not accessible — ${msg}`);
+        continue; // try the next candidate
+      }
+      throw err; // real failure (network, parse, etc.)
+    }
+  }
 
-  const text = (response.output_text || "").trim();
-  if (!text) throw new Error("Model returned no text output");
-  return validate(extractJson(text));
+  // Nothing worked: surface which models this key CAN use so SIGNAL_MODEL can be set.
+  let available = "(could not list models)";
+  try {
+    const list = await client.models.list();
+    available = list.data.map((m) => m.id).sort().join(", ");
+  } catch { /* ignore */ }
+  throw new Error(
+    `No accessible web-search model (tried: ${candidates.join(", ")}). ` +
+    `Grant the project access to one of those, or set SIGNAL_MODEL to a model from: ${available}`
+  );
 }
 
 /* ---------- Offline mock (exercises the whole pipeline) ---------- */
@@ -202,7 +233,7 @@ function mock() {
 function writeOutputs(stocks) {
   const payload = {
     generatedAt: new Date().toISOString(),
-    model: DRY_RUN ? "dry-run-mock" : MODEL,
+    model: DRY_RUN ? "dry-run-mock" : usedModel,
     mode: DRY_RUN ? "mock" : "live",
     stocks,
   };

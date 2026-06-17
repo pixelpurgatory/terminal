@@ -64,8 +64,9 @@ python3 -m http.server 8080   # then visit http://localhost:8080
 ## Self-updating AI feed
 
 The terminal can refresh its own signals. A research agent lives in the repo and
-runs **twice a day** (GitHub Actions cron): it calls **OpenAI (`gpt-4.1`,
-Responses API) with web search** (override via the `SIGNAL_MODEL` env var), looks up the latest real-world value for every
+runs **twice a day** (GitHub Actions cron): it calls **OpenAI (Responses API)
+with web search** — trying `gpt-5.5` → `gpt-4.1` → `gpt-4.1-mini` and using the
+first your project can access (or pin one with the `SIGNAL_MODEL` env var). It looks up the latest real-world value for every
 signal defined in `js/data.js`, and commits the result to `js/live-data.js`. The terminal loads
 that file and overlays it — the feed chip flips to **`◉ LIVE`** with a timestamp,
 and each name gets an **AI READ** summary line with source links. When no live
