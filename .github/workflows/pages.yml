@@ -1,0 +1,49 @@
+name: Deploy to GitHub Pages
+
+# Publishes the static terminal to GitHub Pages. Auto-enables Pages on first run
+# (configure-pages enablement). Redeploys on:
+#   - a code push to the default branch
+#   - completion of the "Update signals" workflow (so the hosted site refreshes
+#     after each AI research run — that bot push uses GITHUB_TOKEN and can't
+#     trigger a push event, hence the workflow_run trigger)
+#   - manual dispatch
+
+on:
+  push:
+    branches: ["claude/matrix-stocks-terminal-v8u4pp"]
+  workflow_run:
+    workflows: ["Update signals (AI research)"]
+    types: [completed]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure Pages (auto-enable)
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "."
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
