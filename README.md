@@ -35,7 +35,21 @@ contested) and an importance weight, then rolled up into a per-name
 | **GEV**  | total backlog, gas-turbine slots, contracted GW, datacenter power orders, FCF margin, grid backlog |
 | *all*    | relative strength vs sector, IV rank/skew, insider selling, EPS revision trend |
 
-## Run it
+## Access it
+
+**Live now (zero setup):**
+https://htmlpreview.github.io/?https://raw.githubusercontent.com/pixelpurgatory/terminal/claude/matrix-stocks-terminal-v8u4pp/index.html
+
+**Nicer permanent URL — `https://pixelpurgatory.github.io/terminal/`** — needs one
+one-time toggle (the repo's CI token can't enable Pages on its own):
+
+> Repo **Settings → Pages → Build and deployment → Source: _Deploy from a branch_**,
+> branch **`claude/matrix-stocks-terminal-v8u4pp`**, folder **`/ (root)`** → Save.
+
+In branch mode GitHub serves the site directly and **rebuilds on every commit** —
+so the twice-daily AI data refresh shows up automatically, no extra workflow.
+
+## Run it locally
 
 No build step, no dependencies. Just open it:
 
