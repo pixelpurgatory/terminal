@@ -110,11 +110,14 @@ Coverage (important):
   change, earnings-estimate revisions, and relative strength vs a sector ETF can all be
   computed or sourced from earnings releases, 10-Q/10-K/8-K, IR decks, and reputable
   finance sites. Pull these whenever you can.
-- OMIT a signal ONLY when it is genuinely not publicly available or you cannot verify a
-  current value. Never guess and never carry forward a stale figure — it is strictly
-  better to omit a signal than to show an outdated or fabricated number.
-- Signals that are often NOT freely available (omit unless you find a verifiable current
-  source): single-name CDS spreads, proprietary options IV-rank/skew, exact insider $ sums.
+- For market signals that aren't in filings — single-name CDS spread, options IV-rank/skew,
+  notable insider selling, relative strength vs sector — search RECENT NEWS HEADLINES and
+  analyst/credit-market commentary (past few weeks) and report the most recently reported
+  figure, including the source URL and reflecting its date in asOf. For example, Oracle's
+  ~5yr CDS spread is frequently quoted in credit-market news after debt issuance — find the
+  latest cited level.
+- OMIT a signal ONLY when no credible recent source gives a value. Never guess and never
+  carry forward a stale figure — better to omit than to show an outdated or fabricated number.
 
 Formatting:
 - Keep value <= 16 chars and note <= 130 chars. Use the most recent reported figure and
