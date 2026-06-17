@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-17T23:42:33.333Z",
+  "generatedAt": "2026-06-17T23:47:08.583Z",
   "model": "gpt-5.5",
   "mode": "live",
   "stocks": {
@@ -10,32 +10,40 @@
           "delta": "+$85B QoQ",
           "trend": "up",
           "stance": "bull",
-          "raw": 98,
-          "note": "Backlog exploded again, validating demand but raising the bar for delivery."
+          "raw": 100,
+          "note": "RPO surged to nearly 10x FY revenue, confirming enormous AI infrastructure demand."
         },
         "rpoconv": {
           "value": "3.0%/qtr",
-          "delta": "-0.1pp QoQ",
-          "trend": "down",
+          "delta": "+0.1pp QoQ",
+          "trend": "up",
           "stance": "bear",
-          "raw": 25,
-          "note": "Q4 revenue was tiny versus RPO, so conversion remains the key bear argument."
+          "raw": 20,
+          "note": "Q4 revenue was only about 3% of RPO, so delivery still badly lags backlog growth."
         },
         "oci": {
           "value": "+93% YoY",
-          "delta": "+9pp QoQ",
+          "delta": "+16pp FY",
           "trend": "up",
           "stance": "bull",
-          "raw": 96,
-          "note": "OCI accelerated sharply and is the clearest support for the AI-cloud thesis."
+          "raw": 98,
+          "note": "OCI growth accelerated sharply, the clearest validation of Oracle's AI-cloud thesis."
+        },
+        "airunrate": {
+          "value": "$23.2B OCI ARR",
+          "delta": "",
+          "trend": "up",
+          "stance": "bull",
+          "raw": 85,
+          "note": "Annualized Q4 OCI revenue is scaling fast, though Oracle does not disclose pure AI revenue."
         },
         "capex": {
-          "value": "82.7%",
+          "value": "82.6%",
           "delta": "",
           "trend": "up",
           "stance": "bear",
-          "raw": 98,
-          "note": "FY26 capex intensity is extreme, front-loading risk before much RPO converts."
+          "raw": 100,
+          "note": "Implied FY26 capex of $55.7B is an extreme share of revenue and front-loads risk."
         },
         "fcf": {
           "value": "-35.2%",
@@ -43,7 +51,7 @@
           "trend": "down",
           "stance": "bear",
           "raw": 5,
-          "note": "FCF turned deeply negative as datacenter spend overwhelmed operating cash."
+          "note": "Negative $23.7B FCF shows the AI buildout is overwhelming operating cash flow."
         },
         "debt": {
           "value": "$43B",
@@ -51,130 +59,130 @@
           "trend": "up",
           "stance": "bear",
           "raw": 95,
-          "note": "FY26 debt financing was very large, making leverage part of the equity debate."
+          "note": "FY26 debt financing was very large, increasing balance-sheet sensitivity to execution."
         },
-        "rs": {
-          "value": "-2.2pp 1d",
+        "bond35": {
+          "value": "96.9 / 6.04%",
           "delta": "",
           "trend": "down",
           "stance": "bear",
-          "raw": 35,
-          "note": "ORCL lagged XLK on the latest tape, showing pressure after the print."
+          "raw": 70,
+          "note": "The long 2035 bond yield remains elevated, reflecting credit concern around capex."
+        },
+        "rs": {
+          "value": "-2.2% 1D",
+          "delta": "",
+          "trend": "down",
+          "stance": "bear",
+          "raw": 25,
+          "note": "Shares underperformed XLK today, so near-term momentum has turned against the tape."
         }
       },
       "price": 183.53,
       "changePct": -2.54,
       "asOf": "2026-06-17",
-      "summary": "RPO and OCI growth are extraordinary, but FY26 capex, negative FCF and financing needs keep execution risk high.",
+      "summary": "Oracle's verified backlog and OCI growth are exceptional, but capex, negative FCF and financing needs keep execution risk high.",
       "sources": [
-        "https://investor.oracle.com/investor-news/news-details/2026/Oracle-Announces-Record-Q4-and-FY-2026-Results-Driven-by-Cloud-Infrastructure--Cloud-Applications/",
+        "https://www.oracle.com/news/announcement/q4fy26-earnings-release-2026-06-10/",
         "https://www.tradingview.com/symbols/NYSE-ORCL/bonds/",
-        "https://finance.yahoo.com/quote/ORCL/"
+        "https://www.boerse-stuttgart.de/en/products/bonds/stuttgart/a4d6mv-oracle-corp-dl-notes-2025-25-35"
       ]
     },
     "MSFT": {
       "signals": {
         "azure": {
           "value": "+40% YoY",
-          "delta": "+1pp vs guide",
+          "delta": "+1pp QoQ",
           "trend": "up",
           "stance": "bull",
-          "raw": 92,
-          "note": "Azure beat expectations and demand still exceeds available capacity."
+          "raw": 95,
+          "note": "Azure accelerated again, supporting the view that AI demand is converting into cloud growth."
         },
         "airunrate": {
           "value": "$37B",
           "delta": "+123% YoY",
           "trend": "up",
           "stance": "bull",
-          "raw": 94,
-          "note": "AI run-rate scaled fast enough to keep the monetization thesis intact."
-        },
-        "copilot": {
-          "value": "20M seats",
-          "delta": "",
-          "trend": "up",
-          "stance": "bull",
-          "raw": 80,
-          "note": "Paid M365 Copilot seats are now large enough to matter for ARPU."
+          "raw": 95,
+          "note": "AI business ARR more than doubled year over year, validating monetization at scale."
         },
         "capex": {
-          "value": "38.5%",
-          "delta": "",
-          "trend": "up",
-          "stance": "bear",
-          "raw": 90,
-          "note": "Q3 capex intensity is very high and Q4 spend is guided above $40B."
+          "value": "37.2%",
+          "delta": "-8.9pp QoQ",
+          "trend": "down",
+          "stance": "neutral",
+          "raw": 82,
+          "note": "PPE additions remain huge versus revenue, though Q3 intensity eased from Q2."
         },
         "fcf": {
           "value": "19.1%",
-          "delta": "",
+          "delta": "-9.8pp YoY",
           "trend": "down",
-          "stance": "neutral",
-          "raw": 55,
-          "note": "FCF remains positive but is being compressed by AI infrastructure spend."
+          "stance": "bear",
+          "raw": 45,
+          "note": "FCF is still large, but margin compression shows AI capex is biting."
         },
         "gm": {
           "value": "66%",
-          "delta": "down YoY",
+          "delta": "-1pp QoQ",
           "trend": "down",
           "stance": "bear",
-          "raw": 62,
-          "note": "Cloud GM fell as AI infrastructure and Copilot usage diluted margins."
+          "raw": 58,
+          "note": "Microsoft Cloud GM fell again as AI infrastructure and usage costs diluted margins."
         },
         "rs": {
-          "value": "-3.4pp 1d",
+          "value": "-3.4% 1D",
           "delta": "",
           "trend": "down",
           "stance": "bear",
-          "raw": 30,
-          "note": "MSFT underperformed XLK on the day, despite strong operating momentum."
+          "raw": 20,
+          "note": "MSFT lagged XLK sharply today, signaling weak near-term relative momentum."
         },
         "rev": {
-          "value": "19 up 30d",
+          "value": "+1.5% 30d",
           "delta": "",
           "trend": "up",
           "stance": "bull",
-          "raw": 75,
-          "note": "Recent estimate-revision breadth is positive after the Azure beat."
+          "raw": 62,
+          "note": "Consensus EPS moved higher after the Azure and AI beat, a constructive revision signal."
         }
       },
       "price": 378.91,
       "changePct": -3.8,
       "asOf": "2026-06-17",
-      "summary": "Azure and AI monetization remain strong, but the capex ramp is now the central ROIC debate.",
+      "summary": "Microsoft's Azure and AI run-rate remain very strong, but AI capex is visibly compressing cloud and FCF margins.",
       "sources": [
         "https://www.microsoft.com/en-us/investor/earnings/fy-2026-q3/press-release-webcast",
-        "https://www.microsoft.com/en-us/investor/events/fy-2026/earnings-fy-2026-q3",
-        "https://twelvedata.com/markets/194626/stock/nasdaq-msft/analysis",
-        "https://finance.yahoo.com/quote/MSFT/"
+        "https://www.microsoft.com/en-us/Investor/earnings/FY-2026-Q3/performance",
+        "https://www.microsoft.com/en-us/Investor/earnings/FY-2026-Q2/metrics",
+        "https://www.zacks.com/stock/news/2928849/microsoft-corporation-msft-is-attracting-investor-attention-here-is-what-you-should-know"
       ]
     },
     "HOOD": {
       "signals": {
         "deposits": {
           "value": "$17.7B",
-          "delta": "+$1.8B QoQ",
+          "delta": "+11% QoQ",
           "trend": "up",
           "stance": "bull",
-          "raw": 86,
-          "note": "Net deposits stayed robust, supporting the share-of-wallet story."
+          "raw": 82,
+          "note": "Q1 net deposits stayed very strong and imply continued platform share gains."
         },
         "options": {
-          "value": "1.2M/day",
-          "delta": "-0.1M MoM",
+          "value": "10.5M/day",
+          "delta": "-11% QoQ",
           "trend": "down",
           "stance": "neutral",
-          "raw": 64,
-          "note": "Options DARTs eased in March but remain up year over year."
+          "raw": 72,
+          "note": "Options activity is still high year over year, but it cooled from Q4's peak."
         },
         "crypto": {
           "value": "$65.7B",
           "delta": "-20% QoQ",
           "trend": "down",
-          "stance": "bear",
-          "raw": 65,
-          "note": "Crypto volume fell sequentially, showing the volatility of this revenue line."
+          "stance": "neutral",
+          "raw": 70,
+          "note": "Crypto volume remains elevated but fell sequentially, underscoring cyclicality."
         },
         "gold": {
           "value": "4.34M",
@@ -182,33 +190,32 @@
           "trend": "up",
           "stance": "bull",
           "raw": 88,
-          "note": "Gold subscribers hit a new record and deepen recurring revenue."
+          "note": "Gold subscribers reached a record, strengthening recurring revenue quality."
         },
         "arpu": {
           "value": "$157",
           "delta": "-18% QoQ",
           "trend": "down",
           "stance": "bear",
-          "raw": 58,
-          "note": "ARPU fell from Q4 as trading revenue normalized."
+          "raw": 55,
+          "note": "ARPU fell sequentially as trading and crypto revenue cooled from Q4 highs."
         },
         "rs": {
-          "value": "+9.3pp 1d",
+          "value": "+9.3% 1D",
           "delta": "",
           "trend": "up",
           "stance": "bull",
-          "raw": 95,
-          "note": "HOOD sharply outperformed XLF on the latest tape."
+          "raw": 96,
+          "note": "HOOD strongly outperformed XLF today, confirming high-beta momentum."
         }
       },
       "price": 105.2,
       "changePct": 8.75,
       "asOf": "2026-06-17",
-      "summary": "Robinhood’s franchise metrics remain strong, though crypto and trading volumes cooled sequentially.",
+      "summary": "Robinhood still shows strong deposit and engagement momentum, though Q1 trading and ARPU cooled sequentially.",
       "sources": [
         "https://investors.robinhood.com/static-files/6840cc36-4a2d-46d8-a9c3-0b334da724f8",
-        "https://www.nasdaq.com/press-release/robinhood-reports-first-quarter-2026-results-2026-04-28",
-        "https://finance.yahoo.com/quote/HOOD/"
+        "https://www.nasdaq.com/press-release/robinhood-reports-first-quarter-2026-results-2026-04-28"
       ]
     },
     "NKE": {
@@ -219,58 +226,56 @@
           "trend": "down",
           "stance": "bear",
           "raw": 35,
-          "note": "Gross margin remains the central problem in the turnaround."
+          "note": "Gross margin fell again, showing the turnaround has not yet reached profitability."
         },
         "inv": {
           "value": "-1% YoY",
           "delta": "",
           "trend": "down",
           "stance": "bull",
-          "raw": 62,
-          "note": "Inventory is finally down, which helps the margin-recovery setup."
+          "raw": 58,
+          "note": "Inventory finally declined year over year, a modest positive for future markdown pressure."
         },
-        "china": {
-          "value": "-7% YoY",
-          "delta": "",
-          "trend": "down",
-          "stance": "bear",
-          "raw": 30,
-          "note": "Greater China remains a drag and limits any quick re-rating."
-        },
-        "dtc": {
-          "value": "-7% cc",
-          "delta": "",
-          "trend": "down",
-          "stance": "bear",
-          "raw": 35,
-          "note": "Direct is still declining as Nike rebalances toward wholesale."
-        },
-        "rs": {
-          "value": "+0.6pp 1d",
+        "markdown": {
+          "value": "Elevated",
           "delta": "",
           "trend": "up",
-          "stance": "neutral",
-          "raw": 52,
-          "note": "NKE slightly outperformed XLY on the day, but the longer tape remains weak."
+          "stance": "bear",
+          "raw": 75,
+          "note": "Management still called markdowns elevated, keeping margin recovery at risk."
         },
-        "rev": {
-          "value": "23 down 30d",
+        "china": {
+          "value": "-10% YoY",
           "delta": "",
           "trend": "down",
           "stance": "bear",
           "raw": 25,
-          "note": "Revision breadth remains negative, signaling low confidence in recovery timing."
+          "note": "Greater China remains a major drag and Q4 guidance implies further pressure."
+        },
+        "dtc": {
+          "value": "-7% CN",
+          "delta": "",
+          "trend": "down",
+          "stance": "bear",
+          "raw": 32,
+          "note": "Nike Direct and Digital are still declining as the company rebalances the marketplace."
+        },
+        "rs": {
+          "value": "+0.6% 1D",
+          "delta": "",
+          "trend": "up",
+          "stance": "neutral",
+          "raw": 55,
+          "note": "NKE slightly outperformed XLY today, but one day is not enough to prove a turn."
         }
       },
       "price": 44.19,
       "changePct": -1.89,
       "asOf": "2026-06-17",
-      "summary": "Nike is still in a reset: inventory is improving, but margins, China and Direct remain under pressure.",
+      "summary": "Nike is making cleanup progress, but margins, China, digital and promotions still point to an unfinished turnaround.",
       "sources": [
         "https://investors.nike.com/investors/news-events-and-reports/investor-news/investor-news-details/2026/NIKE-Inc--Reports-Fiscal-2026-Third-Quarter-Results/default.aspx",
-        "https://www.fool.com/earnings/call-transcripts/2026/04/01/nike-nke-q3-2026-earnings-call-transcript/",
-        "https://twelvedata.com/markets/834166/stock/nyse-nke/analysis",
-        "https://finance.yahoo.com/quote/NKE/"
+        "https://s1.q4cdn.com/806093406/files/doc_financials/2026/q3/NIKE-Inc-Q3FY26-OFFICIAL-Transcript.pdf"
       ]
     },
     "GEV": {
@@ -280,8 +285,8 @@
           "delta": "+$13B QoQ",
           "trend": "up",
           "stance": "bull",
-          "raw": 96,
-          "note": "Backlog reached a new high and supports multi-year visibility."
+          "raw": 98,
+          "note": "Backlog hit a new high, giving exceptional multiyear revenue visibility."
         },
         "turbine": {
           "value": "100 GW",
@@ -289,7 +294,7 @@
           "trend": "up",
           "stance": "bull",
           "raw": 95,
-          "note": "Gas Power backlog plus reservations keeps capacity tight and pricing strong."
+          "note": "Gas turbine backlog and reservations jumped, confirming scarce capacity and pricing power."
         },
         "gw": {
           "value": "100 GW",
@@ -297,49 +302,49 @@
           "trend": "up",
           "stance": "bull",
           "raw": 95,
-          "note": "Contracted and reserved gas-turbine GW continue to compound."
+          "note": "Contracted and reserved gas capacity rose sharply, strengthening the power-supercycle case."
         },
         "dcpower": {
           "value": "$2.4B",
-          "delta": ">FY25 total",
+          "delta": "",
           "trend": "up",
           "stance": "bull",
-          "raw": 90,
-          "note": "Data-center equipment orders already exceeded all of last year."
+          "raw": 88,
+          "note": "Q1 data-center electrification orders exceeded all of 2025, a direct AI-power proof point."
         },
         "fcf": {
-          "value": "51.3%",
-          "delta": "+39pp YoY",
+          "value": "51.6%",
+          "delta": "",
           "trend": "up",
           "stance": "bull",
-          "raw": 98,
-          "note": "Q1 FCF was exceptional, helped by working capital and order down-payments."
+          "raw": 100,
+          "note": "Q1 FCF was unusually strong versus revenue, showing powerful cash conversion."
         },
         "grid": {
-          "value": "$38.6B",
-          "delta": "+75% YoY",
+          "value": "$2.4B DC ord",
+          "delta": "",
           "trend": "up",
           "stance": "bull",
-          "raw": 94,
-          "note": "Electrification equipment backlog shows grid demand remains very tight."
+          "raw": 86,
+          "note": "Electrification orders tied to data centers highlight strong grid-equipment demand."
         },
         "rs": {
-          "value": "+6.9pp 1d",
+          "value": "+7.0% 1D",
           "delta": "",
           "trend": "up",
           "stance": "bull",
           "raw": 94,
-          "note": "GEV strongly outperformed XLI on the latest tape."
+          "note": "GEV sharply outperformed XLI today, reinforcing leadership within industrials."
         }
       },
       "price": 1048.86,
       "changePct": 6.82,
       "asOf": "2026-06-17",
-      "summary": "GE Vernova remains a power-infrastructure leader with surging backlog, strong data-center orders and exceptional cash generation.",
+      "summary": "GE Vernova remains a standout electrification and power-capacity compounder, with backlog and cash flow sharply ahead.",
       "sources": [
-        "https://www.gevernova.com/sites/default/files/gev_webcast_pressrelease_04222026.pdf",
         "https://www.gevernova.com/news/press-releases/ge-vernova-reports-first-quarter-2026-financial",
-        "https://finance.yahoo.com/quote/GEV/"
+        "https://www.gevernova.com/news/articles/ge-vernova-releases-first-quarter-2026-financial-results",
+        "https://mgrid.org/2026/04/22/ge-vernovas-gas-turbine-backlog-hits-100-gw-as-data-centers-drive-4-billion-in-q1-orders/"
       ]
     }
   }
