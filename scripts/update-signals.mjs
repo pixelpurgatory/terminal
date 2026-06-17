@@ -35,10 +35,16 @@ function loadCuratedModel() {
 const { STOCKS, STOCK_ORDER } = loadCuratedModel();
 
 const DRY_RUN = process.argv.includes("--dry-run");
-// Models that support the Responses API web_search tool, tried in order.
-// Override with SIGNAL_MODEL to pin one your OpenAI project has access to.
-const WEB_SEARCH_MODELS = ["gpt-5.5", "gpt-4.1", "gpt-4.1-mini"];
-let usedModel = process.env.SIGNAL_MODEL || WEB_SEARCH_MODELS[0];
+// Web-search-capable models, tried in order, each with its correct tool type
+// (newer models use "web_search"; gpt-4o uses the legacy "web_search_preview").
+// Pin one with SIGNAL_MODEL (tool defaults to web_search; override SIGNAL_SEARCH_TOOL).
+const MODEL_CANDIDATES = [
+  { model: "gpt-5.5", tool: "web_search" },
+  { model: "gpt-4.1", tool: "web_search" },
+  { model: "gpt-4.1-mini", tool: "web_search" },
+  { model: "gpt-4o", tool: "web_search_preview" },
+];
+let usedModel = process.env.SIGNAL_MODEL || MODEL_CANDIDATES[0].model;
 
 const TRENDS = new Set(["up", "down", "flat"]);
 const STANCES = new Set(["bull", "bear", "neutral"]);
@@ -164,20 +170,22 @@ async function research() {
   const { default: OpenAI } = await import("openai");
   const client = new OpenAI({ timeout: 600000 }); // 10 min — web search loops are slow
   const input = buildPrompt(buildSpec());
-  const candidates = process.env.SIGNAL_MODEL ? [process.env.SIGNAL_MODEL] : WEB_SEARCH_MODELS;
+  const candidates = process.env.SIGNAL_MODEL
+    ? [{ model: process.env.SIGNAL_MODEL, tool: process.env.SIGNAL_SEARCH_TOOL || "web_search" }]
+    : MODEL_CANDIDATES;
 
-  for (const model of candidates) {
+  for (const { model, tool } of candidates) {
     try {
       const response = await client.responses.create({
         model,
-        tools: [{ type: "web_search" }],
+        tools: [{ type: tool }],
         max_output_tokens: 16000,
         input,
       });
       const text = (response.output_text || "").trim();
       if (!text) throw new Error("model returned empty output");
       usedModel = model;
-      console.log(`Researched with model: ${model}`);
+      console.log(`Researched with model: ${model} (${tool})`);
       return validate(extractJson(text));
     } catch (err) {
       const msg = err?.message || String(err);
@@ -196,8 +204,8 @@ async function research() {
     available = list.data.map((m) => m.id).sort().join(", ");
   } catch { /* ignore */ }
   throw new Error(
-    `No accessible web-search model (tried: ${candidates.join(", ")}). ` +
-    `Grant the project access to one of those, or set SIGNAL_MODEL to a model from: ${available}`
+    `No accessible web-search model (tried: ${candidates.map((c) => c.model).join(", ")}). ` +
+    `Grant this key's project access to one, or set SIGNAL_MODEL to a model from: ${available}`
   );
 }
 
