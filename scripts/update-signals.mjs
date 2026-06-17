@@ -95,9 +95,22 @@ Also return per ticker:
   summary  - one sentence: your current read on the name
   sources  - array of 1-4 source URLs you relied on
 
-Rules:
-- If you genuinely cannot find a current value for a signal, OMIT that signal entirely (do not guess).
-- Keep every string short enough for a terminal card (value <= 16 chars, note <= 130 chars).
+Coverage (important):
+- Make a genuine effort to find EVERY signal listed for each ticker via search.
+- Most are publicly available: growth rates, margins, backlog/RPO, FCF, capex, gross
+  margin, China/segment sales, subscribers, deposits, volumes, share price + daily
+  change, earnings-estimate revisions, and relative strength vs a sector ETF can all be
+  computed or sourced from earnings releases, 10-Q/10-K/8-K, IR decks, and reputable
+  finance sites. Pull these whenever you can.
+- OMIT a signal ONLY when it is genuinely not publicly available or you cannot verify a
+  current value. Never guess and never carry forward a stale figure — it is strictly
+  better to omit a signal than to show an outdated or fabricated number.
+- Signals that are often NOT freely available (omit unless you find a verifiable current
+  source): single-name CDS spreads, proprietary options IV-rank/skew, exact insider $ sums.
+
+Formatting:
+- Keep value <= 16 chars and note <= 130 chars. Use the most recent reported figure and
+  reflect its date in the ticker-level asOf.
 - Respond with ONLY a single JSON object, no prose before or after, in this exact shape:
 
 {
