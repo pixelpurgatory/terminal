@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MATRIX // STOCKS TERMINAL</title>
+  <meta name="description" content="A Matrix-style equity signal terminal: ORCL · MSFT · HOOD · NKE · GEV." />
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>📈</text></svg>" />
+</head>
+<body>
+  <!-- Matrix rain backdrop -->
+  <canvas id="matrix-rain" aria-hidden="true"></canvas>
+  <!-- CRT overlay (scanlines + vignette + flicker) -->
+  <div class="crt" aria-hidden="true"></div>
+
+  <!-- Boot sequence -->
+  <div id="boot">
+    <div id="boot-body" role="status" aria-live="polite"></div>
+  </div>
+
+  <div class="shell">
+    <!-- Header -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">▚</span>
+        <span class="brand-name">MATRIX<span class="dim">::</span>TERMINAL</span>
+      </div>
+      <nav class="topnav" aria-label="ticker quick keys">
+        <span class="hint">[1-5] switch</span>
+        <span class="hint">[↑↓] cycle</span>
+        <span class="hint">[/] command</span>
+      </nav>
+      <div class="status">
+        <span id="mkt-status" class="mkt closed">● MARKET CLOSED</span>
+        <span id="clock" class="clock">--:--:-- UTC</span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <!-- Watchlist rail -->
+      <aside class="rail">
+        <h1 class="rail-title">WATCHLIST</h1>
+        <div id="watchlist" role="tablist" aria-label="watchlist"></div>
+        <div class="rail-foot">
+          <span class="sim-badge" title="Prices simulated; signals curated.">◉ SIM FEED</span>
+        </div>
+      </aside>
+
+      <!-- Detail -->
+      <section id="detail" class="detail" role="tabpanel" aria-live="polite"></section>
+    </main>
+
+    <!-- Command console -->
+    <footer class="console">
+      <div id="cmd-log" class="cmd-log" aria-live="polite"></div>
+      <div class="cmd-bar">
+        <span class="prompt">root@matrix<span class="dim">:~$</span></span>
+        <input id="cmd-input" class="cmd-input" type="text" spellcheck="false"
+               autocomplete="off" placeholder="type a ticker or 'help' …"
+               aria-label="terminal command input" />
+        <span class="caret">█</span>
+      </div>
+    </footer>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/matrix.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
