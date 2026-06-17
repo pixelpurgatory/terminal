@@ -275,7 +275,13 @@ body {
 }
 .sim-badge { color: var(--amber); border: 1px solid rgba(255,204,51,.4); padding: 2px 7px; border-radius: 3px; font-size: 10px; letter-spacing: 1px; }
 .sim-badge.live { color: var(--green); border-color: var(--green-dd); text-shadow: var(--glow); animation: pulse 2s infinite; }
-.sim-badge.demo { color: #00cfff; border-color: rgba(0,207,255,.4); }
+.sim-badge.demo { color: var(--amber); border-color: rgba(255,204,51,.4); }
+
+/* ----- No-data notice ----- */
+.no-data {
+  margin: 18px 0; padding: 18px; border: 1px dashed var(--green-dd); border-radius: 4px;
+  background: rgba(255,204,51,.04); color: var(--amber); font-size: 13px; line-height: 1.5;
+}
 
 /* ----- AI read (live research summary) ----- */
 .ai-read {

@@ -89,8 +89,9 @@ For every signal, return:
   note    - one concise sentence on what this reading means for the thesis right now
 
 Also return per ticker:
-  price    - latest share price as a number (no currency symbol)
-  asOf     - the date your figures reflect, ISO "YYYY-MM-DD"
+  price     - latest share price as a number (no currency symbol)
+  changePct - latest daily price change as a signed number in percent (e.g. -1.8 means -1.8%); omit if unknown
+  asOf      - the date your figures reflect, ISO "YYYY-MM-DD"
   summary  - one sentence: your current read on the name
   sources  - array of 1-4 source URLs you relied on
 
@@ -103,6 +104,7 @@ Rules:
   "stocks": {
     "TICKER": {
       "price": 0,
+      "changePct": 0,
       "asOf": "YYYY-MM-DD",
       "summary": "...",
       "sources": ["https://..."],
@@ -150,6 +152,7 @@ function validate(raw) {
     }
     const stock = { signals };
     if (Number.isFinite(incoming.price)) stock.price = incoming.price;
+    if (Number.isFinite(incoming.changePct)) stock.changePct = incoming.changePct;
     if (typeof incoming.asOf === "string") stock.asOf = incoming.asOf.slice(0, 10);
     if (typeof incoming.summary === "string") stock.summary = incoming.summary.trim().slice(0, 240);
     if (Array.isArray(incoming.sources)) {
@@ -228,6 +231,7 @@ function mock() {
     }
     out[sym] = {
       price: s.price,
+      changePct: Math.round((Math.random() - 0.5) * 60) / 10,
       asOf: new Date().toISOString().slice(0, 10),
       summary: `[MOCK] ${s.tag} — dry-run synthesized snapshot.`,
       sources: ["https://example.com/mock-source"],

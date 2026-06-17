@@ -68,9 +68,10 @@ runs **twice a day** (GitHub Actions cron): it calls **OpenAI (Responses API)
 with web search** — trying `gpt-5.5` → `gpt-4.1` → `gpt-4.1-mini` and using the
 first your project can access (or pin one with the `SIGNAL_MODEL` env var). It looks up the latest real-world value for every
 signal defined in `js/data.js`, and commits the result to `js/live-data.js`. The terminal loads
-that file and overlays it — the feed chip flips to **`◉ LIVE`** with a timestamp,
-and each name gets an **AI READ** summary line with source links. When no live
-data is present, it falls back to the curated values (`◉ SIM FEED`).
+that file and renders **only that real data** — the feed chip shows **`◉ LIVE`**
+with a timestamp, and each name gets an **AI READ** summary line with source
+links. There is no simulated price tape and no synthetic charts; if the feed is
+missing, the terminal shows a **`◉ NO LIVE DATA`** notice rather than fake values.
 
 ```
 GitHub Actions (cron, 2×/day)
@@ -104,12 +105,14 @@ refresh time.
 
 ## Data honesty
 
-Intraday **prices are always a simulated tape** — there is no real-time quote
-feed wired in. The **structural signals** are either AI-researched (`◉ LIVE`,
-when the agent has run) or hand-curated reference values (`◉ SIM FEED`)
-calibrated to each name's 2025–2026 narrative. The `◉ DEMO` chip means the
-offline dry-run mock is loaded (a pipeline test, not real research). Everything
-renders from `js/data.js` + `js/live-data.js`.
+The terminal displays **only real, AI-researched data** from `js/live-data.js`
+(prices, daily change, signal values, summaries, and source links — all from the
+research run). There is no simulated price tape, no random ticks, and no
+synthetic sparklines. `js/data.js` provides **structure only** (names, sectors,
+thesis text, signal labels/groups) — none of its placeholder numbers are shown.
+If no live feed is present, the UI shows a `◉ NO LIVE DATA` notice instead of
+inventing values. (`◉ DEMO` only appears for a local `--dry-run` mock and is
+never committed.)
 
 ## Beta test
 
