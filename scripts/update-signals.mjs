@@ -263,15 +263,26 @@ async function researchOne(client, candidates, sym) {
   return { sym, stock: null, accessError: true };
 }
 
+// Run fn over items with bounded concurrency (fast, but gentle on rate limits).
+async function mapPool(items, concurrency, fn) {
+  const out = new Array(items.length);
+  let i = 0;
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (i < items.length) { const idx = i++; out[idx] = await fn(items[idx], idx); }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
 async function research() {
   const { default: OpenAI } = await import("openai");
-  const client = new OpenAI({ timeout: 300000, maxRetries: 2 }); // 5 min/ticker
+  const client = new OpenAI({ timeout: 540000, maxRetries: 1 }); // 9 min/call, 1 retry
   const candidates = process.env.SIGNAL_MODEL
     ? [{ model: process.env.SIGNAL_MODEL, tool: process.env.SIGNAL_SEARCH_TOOL || "web_search" }]
     : MODEL_CANDIDATES;
 
-  // Resolve a working model on the first ticker, then run the rest in parallel
-  // pinned to that model (avoids N parallel access-fallback probes).
+  // Resolve a working model on the first ticker (cheap on access errors), then
+  // fetch every entry through a small concurrency pool pinned to that model.
   const first = await researchOne(client, candidates, NAV_ORDER[0]);
   if (first.accessError) {
     let available = "(could not list models)";
@@ -285,14 +296,13 @@ async function research() {
     );
   }
   const pinned = candidates.find((c) => c.model === first.model) || candidates[0];
-  console.log(`Researching ${NAV_ORDER.length} entries with ${pinned.model} (${pinned.tool})`);
-
-  const rest = await Promise.all(
-    NAV_ORDER.slice(1).map((sym) => researchOne(client, [pinned], sym))
-  );
+  console.log(`Researching ${NAV_ORDER.length} entries with ${pinned.model} (${pinned.tool}), concurrency 3`);
 
   const out = {};
-  for (const r of [first, ...rest]) if (r.stock) out[r.sym] = r.stock;
+  if (first.stock) out[first.sym] = first.stock;
+  const rest = await mapPool(NAV_ORDER.slice(1), 3, (sym) => researchOne(client, [pinned], sym));
+  for (const r of rest) if (r && r.stock) out[r.sym] = r.stock;
+
   if (!Object.keys(out).length) throw new Error("No valid data produced for any entry");
   return out;
 }
