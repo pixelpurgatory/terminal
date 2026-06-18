@@ -13,14 +13,28 @@
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
   // Live research feed (written by scripts/update-signals.mjs). May be null.
-  const LIVE = (window.LIVE_SIGNALS && window.LIVE_SIGNALS.stocks) ? window.LIVE_SIGNALS : null;
+  let LIVE = null;
   const liveStock = (sym) => (LIVE && LIVE.stocks[sym]) || null;
 
+  const isMacro = (sym) => !!(STOCKS[sym] && STOCKS[sym].macro);
+  const liveSig = (sym, key) => {
+    const g = STOCKS[sym].signals.find((s) => s.key === key);
+    return g && g._live ? g : null;
+  };
+
   // Overlay researched values onto the structural model and flag what's real.
-  // Only flagged (_live) signals are ever rendered.
-  (function applyLiveData() {
+  // Re-runnable (used on load and on manual refresh). Only flagged (_live)
+  // signals are ever rendered.
+  function ingest(data) {
+    LIVE = (data && data.stocks) ? data : null;
+    // Reset any prior overlay first.
+    for (const sym of NAV_ORDER) {
+      const s = STOCKS[sym];
+      s.price = null; s.changePct = null;
+      for (const g of s.signals) delete g._live;
+    }
     if (!LIVE) return;
-    for (const sym of STOCK_ORDER) {
+    for (const sym of NAV_ORDER) {
       const ls = LIVE.stocks[sym];
       if (!ls) continue;
       const s = STOCKS[sym];
@@ -38,7 +52,33 @@
         g._live = true;
       }
     }
-  })();
+  }
+  ingest(window.LIVE_SIGNALS);
+
+  // Re-fetch the committed live-data.js (cache-busted) and re-render. On a
+  // static host there is no backend to trigger a new AI run, so this reloads
+  // the latest committed data; a scheduled run refreshes that twice daily.
+  async function refreshData() {
+    const btn = document.getElementById("refresh-btn");
+    if (btn) { btn.classList.add("spin"); btn.disabled = true; }
+    log("↻ refreshing data …");
+    try {
+      const res = await fetch("js/live-data.js?t=" + Date.now(), { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const scope = {};
+      new Function("window", await res.text())(scope);
+      ingest(scope.LIVE_SIGNALS || null);
+      buildWatchlist();
+      const rf = $(".rail-foot"); if (rf) rf.innerHTML = feedBadge();
+      selectStock(current);
+      log(LIVE ? `◉ refreshed · feed ${timeAgo(LIVE.generatedAt)} (${LIVE.model})` : "◉ no live data");
+    } catch (e) {
+      log("refresh fetch blocked (" + (e.message || e) + ") · doing full reload");
+      setTimeout(() => location.reload(), 700);
+    } finally {
+      if (btn) { btn.classList.remove("spin"); btn.disabled = false; }
+    }
+  }
 
   let current = STOCK_ORDER[0];
 
@@ -79,10 +119,10 @@
     if (!sigs.length) return { pct: 0, label: "NO DATA", cls: "neutral", n: 0 };
     let score = 0, total = 0;
     sigs.forEach((g) => {
-      const w = g.weight || 1;
-      total += w;
-      if (g.stance === "bull") score += w;
-      else if (g.stance === "bear") score -= w;
+      if (!g.weight) return; // weight 0 = display-only (e.g. sentiment); never scored
+      total += g.weight;
+      if (g.stance === "bull") score += g.weight;
+      else if (g.stance === "bear") score -= g.weight;
     });
     const pct = total ? Math.round((score / total) * 100) : 0;
     let label, cls;
@@ -92,6 +132,15 @@
     else if (pct > -45) { label = "BEARISH"; cls = "bear"; }
     else { label = "STRONG BEAR"; cls = "bear"; }
     return { pct, label, cls, n: sigs.length };
+  }
+
+  // For MACRO, express the verdict as a risk regime instead of a bull/bear thesis.
+  function verdictDisplay(sym, v) {
+    if (!isMacro(sym)) return v.label;
+    if (!v.n) return "NO DATA";
+    if (v.cls === "bull") return v.pct >= 45 ? "STRONG RISK-ON" : "RISK-ON";
+    if (v.cls === "bear") return v.pct <= -45 ? "STRONG RISK-OFF" : "RISK-OFF";
+    return "MIXED";
   }
 
   /* ---------- Quote (real price + real daily change) ---------- */
@@ -117,27 +166,85 @@
   function buildWatchlist() {
     const rail = $("#watchlist");
     rail.innerHTML = "";
-    STOCK_ORDER.forEach((sym, i) => {
+    NAV_ORDER.forEach((sym, i) => {
       const s = STOCKS[sym];
       const v = verdict(sym);
+      const macro = isMacro(sym);
+
+      if (macro) {
+        const div = document.createElement("div");
+        div.className = "wl-divider";
+        div.innerHTML = `<span>MACRO REGIME</span><i></i>`;
+        rail.appendChild(div);
+      }
+
+      // MACRO row shows the oil tape in the quote slot (the headline macro print).
+      const wti = macro ? liveSig("MACRO", "wti") : null;
+      const quote = macro
+        ? (wti ? `<span class="wl-price">${esc(wti.value)}</span><span class="wl-chg">WTI</span>` : "")
+        : quoteHTML(sym, false);
+
       const row = document.createElement("button");
-      row.className = "wl-row";
+      row.className = "wl-row" + (macro ? " macro" : "");
       row.dataset.sym = sym;
       row.setAttribute("role", "tab");
       row.innerHTML = `
         <div class="wl-main">
-          <span class="wl-idx">${i + 1}</span>
-          <span class="wl-sym">${sym}</span>
-          <span class="wl-verdict ${v.cls}">${v.label}</span>
+          <span class="wl-idx">${macro ? "M" : i + 1}</span>
+          <span class="wl-sym">${macro ? "MACRO" : sym}</span>
+          <span class="wl-verdict ${v.cls}">${verdictDisplay(sym, v)}</span>
         </div>
         <div class="wl-sub">
-          <span class="wl-name">${s.sector}</span>
+          <span class="wl-name">${esc(s.sector)}</span>
         </div>
-        <div class="wl-quote">${quoteHTML(sym, false)}</div>
+        <div class="wl-quote">${quote}</div>
       `;
       row.addEventListener("click", () => selectStock(sym));
       rail.appendChild(row);
     });
+  }
+
+  // Top-3 breaking news panel (under the signal cards).
+  function newsHTML(ls) {
+    const news = (ls && Array.isArray(ls.news)) ? ls.news.slice(0, 3) : [];
+    if (!news.length) return "";
+    return `
+      <section class="group news">
+        <h3 class="group-h"><span>BREAKING NEWS</span><i></i></h3>
+        <ul class="newslist">
+          ${news.map((n) => `
+            <li>
+              <a href="${esc(n.url)}" target="_blank" rel="noopener">
+                <span class="news-dot"></span><span class="news-title">${esc(n.title)}</span>
+              </a>
+              ${n.source ? `<span class="news-src">${esc(n.source)}</span>` : ""}
+            </li>`).join("")}
+        </ul>
+      </section>`;
+  }
+
+  // Compact macro backdrop shown at the bottom of each stock view.
+  function macroPanelHTML() {
+    const mv = verdict("MACRO");
+    if (!mv.n) return "";
+    const chip = (k) => {
+      const g = liveSig("MACRO", k);
+      return g ? `<span class="mp-chip ${g.stance}"><b>${esc(g.label)}</b> ${esc(g.value)}</span>` : "";
+    };
+    const market = ["wti", "spx", "vix", "us10y", "dxy", "hy", "gold"].map(chip).join("");
+    const geo = ["iran", "ukraine", "cuba", "taiwan"].map((k) => {
+      const g = liveSig("MACRO", k);
+      return g ? `<span class="mp-geo ${g.stance}" title="${esc(g.note)}">${esc(g.label)}: ${esc(g.value)}</span>` : "";
+    }).join("");
+    return `
+      <section class="group macro-panel">
+        <h3 class="group-h"><span>MACRO BACKDROP</span><i></i>
+          <button class="mp-open" data-macro title="open full macro view">OPEN ▸</button></h3>
+        <div class="mp-row">
+          <span class="dt-regime sm ${mv.cls}">${verdictDisplay("MACRO", mv)}</span>${market}
+        </div>
+        ${geo ? `<div class="mp-geo-row">${geo}</div>` : ""}
+      </section>`;
   }
 
   /* ---------- Detail panel ---------- */
@@ -169,13 +276,16 @@
       const dots = "●".repeat(g.weight) + "○".repeat(3 - g.weight);
       const stanceLabel = g.stance === "bull" ? "BULLISH"
         : g.stance === "bear" ? "BEARISH" : "NEUTRAL";
+      const wtHTML = g.weight
+        ? `<span class="card-weight" title="thesis weight">${dots}</span>`
+        : `<span class="card-weight unweighted" title="display only — not scored">unweighted</span>`;
       return `
         <article class="card ${g.stance}" tabindex="0">
           <header class="card-h">
             <span class="card-label">${esc(g.label)}</span>
             <span class="card-tags">
               <span class="card-stance ${g.stance}" title="impact on the bull thesis">${stanceLabel}</span>
-              <span class="card-weight" title="thesis weight">${dots}</span>
+              ${wtHTML}
             </span>
           </header>
           <div class="card-val">
@@ -197,13 +307,13 @@
 
     const verdictHTML = v.n ? `
       <div class="verdict">
-        <span class="verdict-label">THESIS VERDICT</span>
+        <span class="verdict-label">${isMacro(sym) ? "REGIME" : "THESIS VERDICT"}</span>
         <div class="verdict-meter">
           <div class="verdict-track">
             <span class="verdict-zero"></span>
             <i class="verdict-fill ${v.cls}"></i>
           </div>
-          <span class="verdict-val ${v.cls}">${v.label} · ${signed(v.pct,0)}</span>
+          <span class="verdict-val ${v.cls}">${verdictDisplay(sym, v)} · ${signed(v.pct,0)}</span>
         </div>
       </div>` : "";
 
@@ -216,7 +326,9 @@
             <span class="dt-sector">// ${esc(s.sector)}</span>
           </div>
         </div>
-        <div class="dt-quote">${quoteHTML(sym, true)}</div>
+        <div class="dt-quote">${isMacro(sym)
+          ? `<span class="dt-regime ${v.cls}">${verdictDisplay(sym, v)}</span>`
+          : quoteHTML(sym, true)}</div>
       </div>
 
       <div class="dt-thesis">
@@ -228,11 +340,18 @@
 
       ${bodyHTML}
 
+      ${newsHTML(ls)}
+
+      ${isMacro(sym) ? "" : macroPanelHTML()}
+
       <footer class="dt-foot">
         ${feedBadge()}
-        <span>${v.n} live signal${v.n === 1 ? "" : "s"} · weighted by thesis impact · ●●● = high</span>
+        <span>${v.n} live signal${v.n === 1 ? "" : "s"} · sentiment shown but unweighted</span>
       </footer>
     `;
+
+    const openMacro = $("[data-macro]", root);
+    if (openMacro) openMacro.addEventListener("click", () => selectStock("MACRO"));
 
     // Animate verdict fill width.
     requestAnimationFrame(() => {
@@ -285,8 +404,11 @@
     switch (cmd) {
       case "help":
       case "?":
-        log("commands: <TICKER> | list | thesis | feed | next | prev | top | help | clear");
-        log("tickers: " + STOCK_ORDER.join(" · "));
+        log("commands: <TICKER> | macro | list | thesis | feed | next | prev | top | help | clear");
+        log("nav: keys [1-6] / [m] for macro · " + NAV_ORDER.join(" · "));
+        break;
+      case "macro":
+        selectStock("MACRO");
         break;
       case "feed":
         if (LIVE && LIVE.mode === "live") {
@@ -326,9 +448,9 @@
   }
 
   function cycle(dir) {
-    const i = STOCK_ORDER.indexOf(current);
-    const n = (i + dir + STOCK_ORDER.length) % STOCK_ORDER.length;
-    selectStock(STOCK_ORDER[n]);
+    const i = NAV_ORDER.indexOf(current);
+    const n = (i + dir + NAV_ORDER.length) % NAV_ORDER.length;
+    selectStock(NAV_ORDER[n]);
   }
 
   /* ---------- Keyboard ---------- */
@@ -338,11 +460,13 @@
       if (e.key === "Enter") { runCommand(input.value); input.value = ""; }
       return;
     }
-    if (e.key >= "1" && e.key <= "5") {
+    if (e.key >= "1" && e.key <= "9") {
       const idx = parseInt(e.key, 10) - 1;
-      if (STOCK_ORDER[idx]) selectStock(STOCK_ORDER[idx]);
-    } else if (e.key === "ArrowDown" || e.key === "j") { cycle(1); }
+      if (NAV_ORDER[idx]) selectStock(NAV_ORDER[idx]);
+    } else if (e.key === "m" || e.key === "M") { selectStock("MACRO"); }
+    else if (e.key === "ArrowDown" || e.key === "j") { cycle(1); }
     else if (e.key === "ArrowUp" || e.key === "k") { cycle(-1); }
+    else if (e.key === "r" || e.key === "R") { refreshData(); }
     else if (e.key === "/") { e.preventDefault(); input.focus(); }
   }
 
@@ -404,6 +528,8 @@
 
     setInterval(updateClock, 1000);
     document.addEventListener("keydown", onKey);
+    const rb = document.getElementById("refresh-btn");
+    if (rb) rb.addEventListener("click", refreshData);
 
     boot();
   }

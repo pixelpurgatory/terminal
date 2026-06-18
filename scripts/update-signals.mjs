@@ -32,7 +32,10 @@ function loadCuratedModel() {
   new Function("module", "exports", code)(shim, shim.exports);
   return shim.exports;
 }
-const { STOCKS, STOCK_ORDER } = loadCuratedModel();
+const curated = loadCuratedModel();
+const { STOCKS } = curated;
+// NAV_ORDER includes the MACRO regime entry; fall back for older data.js.
+const NAV_ORDER = curated.NAV_ORDER || curated.STOCK_ORDER;
 
 const DRY_RUN = process.argv.includes("--dry-run");
 // Web-search-capable models, tried in order, each with its correct tool type
@@ -52,7 +55,7 @@ const STANCES = new Set(["bull", "bear", "neutral"]);
 /* ---------- Build the research spec from the curated model ---------- */
 function buildSpec() {
   const spec = {};
-  for (const sym of STOCK_ORDER) {
+  for (const sym of NAV_ORDER) {
     const s = STOCKS[sym];
     spec[sym] = {
       name: s.name,
@@ -96,6 +99,9 @@ Also return per ticker:
   asOf      - the date your figures reflect, ISO "YYYY-MM-DD"
   summary  - one sentence: your current read on the name
   sources  - array of 1-4 source URLs you relied on
+  news     - array of up to 3 of the LATEST breaking-news headlines about this name, most
+             recent first, each { "title": "...", "url": "https://...", "source": "outlet" }.
+             Use reputable, genuinely recent items.
 
 Precision (important):
 - Check EACH signal individually. Verify its current figure from a real, recent source
@@ -119,6 +125,21 @@ Coverage (important):
 - OMIT a signal ONLY when no credible recent source gives a value. Never guess and never
   carry forward a stale figure — better to omit than to show an outdated or fabricated number.
 
+Sentiment signals (x_sent, reddit_sent, pro_sent):
+- These are SENTIMENT reads, not fundamentals. Set value to a short read (e.g. "Bullish 70%",
+  "Mixed", "Bearish"), stance to bull/bear/neutral matching that sentiment, and note one line
+  citing what you observed (recent X/Twitter posts, Reddit threads, or sell-side ratings/PT
+  changes). They are display-only and do not affect the verdict.
+
+The MACRO entry (cross-asset & geopolitical regime, not a company):
+- Omit price/changePct. For each signal set value to the latest level or a short status,
+  trend to its direction, and stance to the RISK-ASSET implication: "bull" = risk-on /
+  supportive (e.g. easing inflation, falling VIX, lower yields, de-escalation), "bear" =
+  risk-off (e.g. oil spike, rising yields, widening spreads, escalation).
+- For the geopolitical signals (iran, ukraine, cuba, taiwan) summarize the CURRENT situation
+  from the LATEST news headlines, give a short status as value (e.g. "Escalating", "Tense",
+  "Ceasefire talks"), and include the headline source URL.
+
 Formatting:
 - Keep value <= 16 chars and note <= 130 chars. Use the most recent reported figure and
   reflect its date in the ticker-level asOf.
@@ -132,6 +153,7 @@ Formatting:
       "asOf": "YYYY-MM-DD",
       "summary": "...",
       "sources": ["https://..."],
+      "news": [{ "title": "...", "url": "https://...", "source": "outlet" }],
       "signals": {
         "signalKey": { "value": "...", "delta": "...", "trend": "up", "stance": "bull", "raw": 0, "note": "..." }
       }
@@ -158,7 +180,7 @@ function extractJson(text) {
 function validate(raw) {
   const out = {};
   const stocks = (raw && raw.stocks) || {};
-  for (const sym of STOCK_ORDER) {
+  for (const sym of NAV_ORDER) {
     const incoming = stocks[sym];
     if (!incoming) continue;
     const known = new Set(STOCKS[sym].signals.map((g) => g.key));
@@ -183,6 +205,17 @@ function validate(raw) {
       stock.sources = incoming.sources
         .filter((u) => typeof u === "string" && /^https?:\/\//.test(u))
         .slice(0, 4);
+    }
+    if (Array.isArray(incoming.news)) {
+      stock.news = incoming.news
+        .filter((n) => n && typeof n.title === "string" && n.title.trim() &&
+                       typeof n.url === "string" && /^https?:\/\//.test(n.url))
+        .slice(0, 3)
+        .map((n) => ({
+          title: n.title.trim().slice(0, 160),
+          url: n.url,
+          source: typeof n.source === "string" ? n.source.trim().slice(0, 40) : "",
+        }));
     }
     if (Object.keys(signals).length) out[sym] = stock;
   }
@@ -239,7 +272,7 @@ async function research() {
 /* ---------- Offline mock (exercises the whole pipeline) ---------- */
 function mock() {
   const out = {};
-  for (const sym of STOCK_ORDER) {
+  for (const sym of NAV_ORDER) {
     const s = STOCKS[sym];
     const signals = {};
     for (const g of s.signals) {
@@ -259,6 +292,11 @@ function mock() {
       asOf: new Date().toISOString().slice(0, 10),
       summary: `[MOCK] ${s.tag} — dry-run synthesized snapshot.`,
       sources: ["https://example.com/mock-source"],
+      news: [1, 2, 3].map((i) => ({
+        title: `[MOCK] ${sym} breaking headline ${i}`,
+        url: "https://example.com/" + sym.toLowerCase() + "/" + i,
+        source: "Mock Wire",
+      })),
       signals,
     };
   }
@@ -285,7 +323,7 @@ function writeOutputs(stocks) {
 
   const n = Object.keys(stocks).length;
   const sig = Object.values(stocks).reduce((a, s) => a + Object.keys(s.signals).length, 0);
-  console.log(`Wrote live data: ${n}/${STOCK_ORDER.length} tickers, ${sig} signals (${payload.mode}).`);
+  console.log(`Wrote live data: ${n}/${NAV_ORDER.length} tickers, ${sig} signals (${payload.mode}).`);
 }
 
 /* ---------- Main ---------- */
