@@ -7,8 +7,9 @@
  *  and data/live.json (a human-readable record).
  *
  *  The curated model in js/data.js is the single source of truth for WHICH
- *  signals exist; this script refreshes their VALUES. Anything the model can't
- *  confidently find is left out and the UI falls back to the curated value.
+ *  signals exist; this script researches their VALUES one ticker at a time.
+ *  Anything the model can't verify is omitted (never faked); the UI shows only
+ *  the signals that came back with a real value.
  *
  *  Usage:
  *    node scripts/update-signals.mjs            # live: needs OPENAI_API_KEY
@@ -53,9 +54,9 @@ const TRENDS = new Set(["up", "down", "flat"]);
 const STANCES = new Set(["bull", "bear", "neutral"]);
 
 /* ---------- Build the research spec from the curated model ---------- */
-function buildSpec() {
+function buildSpec(syms = NAV_ORDER) {
   const spec = {};
-  for (const sym of NAV_ORDER) {
+  for (const sym of syms) {
     const s = STOCKS[sym];
     spec[sym] = {
       name: s.name,
@@ -177,96 +178,123 @@ function extractJson(text) {
 }
 
 /* ---------- Validate + coerce against the curated schema ---------- */
-function validate(raw) {
-  const out = {};
-  const stocks = (raw && raw.stocks) || {};
-  for (const sym of NAV_ORDER) {
-    const incoming = stocks[sym];
-    if (!incoming) continue;
-    const known = new Set(STOCKS[sym].signals.map((g) => g.key));
-    const signals = {};
-    for (const [key, v] of Object.entries(incoming.signals || {})) {
-      if (!known.has(key) || !v || typeof v !== "object") continue;
-      const entry = {};
-      if (typeof v.value === "string" && v.value.trim()) entry.value = v.value.trim().slice(0, 24);
-      if (typeof v.delta === "string") entry.delta = v.delta.trim().slice(0, 24);
-      if (TRENDS.has(v.trend)) entry.trend = v.trend;
-      if (STANCES.has(v.stance)) entry.stance = v.stance;
-      if (Number.isFinite(v.raw)) entry.raw = Math.max(0, Math.min(100, Math.round(v.raw)));
-      if (typeof v.note === "string" && v.note.trim()) entry.note = v.note.trim().slice(0, 160);
-      if (entry.value) signals[key] = entry; // a signal is only useful with a value
-    }
-    const stock = { signals };
-    if (Number.isFinite(incoming.price)) stock.price = incoming.price;
-    if (Number.isFinite(incoming.changePct)) stock.changePct = incoming.changePct;
-    if (typeof incoming.asOf === "string") stock.asOf = incoming.asOf.slice(0, 10);
-    if (typeof incoming.summary === "string") stock.summary = incoming.summary.trim().slice(0, 240);
-    if (Array.isArray(incoming.sources)) {
-      stock.sources = incoming.sources
-        .filter((u) => typeof u === "string" && /^https?:\/\//.test(u))
-        .slice(0, 4);
-    }
-    if (Array.isArray(incoming.news)) {
-      stock.news = incoming.news
-        .filter((n) => n && typeof n.title === "string" && n.title.trim() &&
-                       typeof n.url === "string" && /^https?:\/\//.test(n.url))
-        .slice(0, 3)
-        .map((n) => ({
-          title: n.title.trim().slice(0, 160),
-          url: n.url,
-          source: typeof n.source === "string" ? n.source.trim().slice(0, 40) : "",
-        }));
-    }
-    if (Object.keys(signals).length) out[sym] = stock;
+// Values that mean "not found" — treated as absent so nothing fake/blank shows.
+const NA_VALUES = new Set(["n/a", "na", "n.a.", "-", "–", "—", "tbd", "unknown", "none", "null", "?"]);
+const isNA = (s) => NA_VALUES.has(String(s).trim().toLowerCase());
+
+// Validate one ticker's payload against its known signal keys. Returns the
+// cleaned stock object, or null if it has no usable signals.
+function validateStock(sym, incoming) {
+  if (!incoming || typeof incoming !== "object") return null;
+  const known = new Set(STOCKS[sym].signals.map((g) => g.key));
+  const signals = {};
+  for (const [key, v] of Object.entries(incoming.signals || {})) {
+    if (!known.has(key) || !v || typeof v !== "object") continue;
+    const entry = {};
+    if (typeof v.value === "string" && v.value.trim() && !isNA(v.value)) entry.value = v.value.trim().slice(0, 24);
+    if (typeof v.delta === "string" && !isNA(v.delta)) entry.delta = v.delta.trim().slice(0, 24);
+    if (TRENDS.has(v.trend)) entry.trend = v.trend;
+    if (STANCES.has(v.stance)) entry.stance = v.stance;
+    if (Number.isFinite(v.raw)) entry.raw = Math.max(0, Math.min(100, Math.round(v.raw)));
+    if (typeof v.note === "string" && v.note.trim()) entry.note = v.note.trim().slice(0, 160);
+    if (entry.value) signals[key] = entry; // a signal is only useful with a real value
   }
-  return out;
+  const stock = { signals };
+  if (Number.isFinite(incoming.price)) stock.price = incoming.price;
+  if (Number.isFinite(incoming.changePct)) stock.changePct = incoming.changePct;
+  if (typeof incoming.asOf === "string") stock.asOf = incoming.asOf.slice(0, 10);
+  if (typeof incoming.summary === "string") stock.summary = incoming.summary.trim().slice(0, 240);
+  if (Array.isArray(incoming.sources)) {
+    stock.sources = incoming.sources
+      .filter((u) => typeof u === "string" && /^https?:\/\//.test(u))
+      .slice(0, 4);
+  }
+  if (Array.isArray(incoming.news)) {
+    stock.news = incoming.news
+      .filter((n) => n && typeof n.title === "string" && n.title.trim() &&
+                     typeof n.url === "string" && /^https?:\/\//.test(n.url))
+      .slice(0, 3)
+      .map((n) => ({
+        title: n.title.trim().slice(0, 160),
+        url: n.url,
+        source: typeof n.source === "string" ? n.source.trim().slice(0, 40) : "",
+      }));
+  }
+  return Object.keys(signals).length ? stock : null;
+}
+
+// Pull this ticker's object out of whatever shape the model returned.
+function pickStock(parsed, sym) {
+  if (!parsed || typeof parsed !== "object") return null;
+  if (parsed.stocks && parsed.stocks[sym]) return parsed.stocks[sym];
+  if (parsed[sym]) return parsed[sym];
+  // Single-ticker reply without the wrapper.
+  if (parsed.signals) return parsed;
+  return null;
 }
 
 /* ---------- Live research via OpenAI Responses API + web_search ---------- */
 const isAccessError = (msg) =>
   /does not have access|model.*not found|unknown model|no such model|\b40[34]\b/i.test(msg);
 
+// Research ONE ticker. Tries the model candidates (cheap on access errors) and
+// returns the validated stock object or null. Much smaller/faster than one
+// mega-call, so it stays well under the request timeout and is more precise.
+async function researchOne(client, candidates, sym) {
+  const input = buildPrompt(buildSpec([sym]));
+  for (const { model, tool } of candidates) {
+    try {
+      const response = await client.responses.create({
+        model, tools: [{ type: tool }], max_output_tokens: 8000, input,
+      });
+      const text = (response.output_text || "").trim();
+      if (!text) throw new Error("empty output");
+      usedModel = model;
+      const stock = validateStock(sym, pickStock(extractJson(text), sym));
+      console.log(`  ${sym}: ${stock ? Object.keys(stock.signals).length + " signals" : "no data"} (${model})`);
+      return { sym, stock, model };
+    } catch (err) {
+      const msg = err?.message || String(err);
+      if (isAccessError(msg)) { continue; } // try next candidate
+      console.warn(`  ${sym}: failed on ${model} — ${msg}`);
+      return { sym, stock: null, accessError: false };
+    }
+  }
+  return { sym, stock: null, accessError: true };
+}
+
 async function research() {
   const { default: OpenAI } = await import("openai");
-  const client = new OpenAI({ timeout: 600000 }); // 10 min — web search loops are slow
-  const input = buildPrompt(buildSpec());
+  const client = new OpenAI({ timeout: 300000, maxRetries: 2 }); // 5 min/ticker
   const candidates = process.env.SIGNAL_MODEL
     ? [{ model: process.env.SIGNAL_MODEL, tool: process.env.SIGNAL_SEARCH_TOOL || "web_search" }]
     : MODEL_CANDIDATES;
 
-  for (const { model, tool } of candidates) {
+  // Resolve a working model on the first ticker, then run the rest in parallel
+  // pinned to that model (avoids N parallel access-fallback probes).
+  const first = await researchOne(client, candidates, NAV_ORDER[0]);
+  if (first.accessError) {
+    let available = "(could not list models)";
     try {
-      const response = await client.responses.create({
-        model,
-        tools: [{ type: tool }],
-        max_output_tokens: 16000,
-        input,
-      });
-      const text = (response.output_text || "").trim();
-      if (!text) throw new Error("model returned empty output");
-      usedModel = model;
-      console.log(`Researched with model: ${model} (${tool})`);
-      return validate(extractJson(text));
-    } catch (err) {
-      const msg = err?.message || String(err);
-      if (isAccessError(msg)) {
-        console.warn(`Model "${model}" not accessible — ${msg}`);
-        continue; // try the next candidate
-      }
-      throw err; // real failure (network, parse, etc.)
-    }
+      const list = await client.models.list();
+      available = list.data.map((m) => m.id).sort().join(", ");
+    } catch { /* ignore */ }
+    throw new Error(
+      `No accessible web-search model (tried: ${candidates.map((c) => c.model).join(", ")}). ` +
+      `Grant this key's project access to one, or set SIGNAL_MODEL to a model from: ${available}`
+    );
   }
+  const pinned = candidates.find((c) => c.model === first.model) || candidates[0];
+  console.log(`Researching ${NAV_ORDER.length} entries with ${pinned.model} (${pinned.tool})`);
 
-  // Nothing worked: surface which models this key CAN use so SIGNAL_MODEL can be set.
-  let available = "(could not list models)";
-  try {
-    const list = await client.models.list();
-    available = list.data.map((m) => m.id).sort().join(", ");
-  } catch { /* ignore */ }
-  throw new Error(
-    `No accessible web-search model (tried: ${candidates.map((c) => c.model).join(", ")}). ` +
-    `Grant this key's project access to one, or set SIGNAL_MODEL to a model from: ${available}`
+  const rest = await Promise.all(
+    NAV_ORDER.slice(1).map((sym) => researchOne(client, [pinned], sym))
   );
+
+  const out = {};
+  for (const r of [first, ...rest]) if (r.stock) out[r.sym] = r.stock;
+  if (!Object.keys(out).length) throw new Error("No valid data produced for any entry");
+  return out;
 }
 
 /* ---------- Offline mock (exercises the whole pipeline) ---------- */
