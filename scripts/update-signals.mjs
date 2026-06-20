@@ -71,8 +71,9 @@ function buildSpec(sym) {
 }
 
 /* ---------- Prompt ---------- */
-// One call covers ALL equities together (cheaper than one call per name); MACRO
-// is its own call with its own, lighter rules. JSON is sent compact to save tokens.
+// One call covers a small GROUP of equities (cheaper than one call per name, but
+// small enough to stay under the TPM limit); MACRO is its own call with its own,
+// lighter rules. JSON is sent compact to save tokens.
 function buildPrompt(syms) {
   const macro = syms.length === 1 && !!(STOCKS[syms[0]] && STOCKS[syms[0]].macro);
   const specs = {};
@@ -221,19 +222,31 @@ async function researchGroup(client, candidates, syms) {
   return { stocks: {}, model: null, accessError: true };
 }
 
+// Equities per call. Small groups keep each call under the per-minute token
+// limit: web_search re-ingests page content every turn, so one big multi-ticker
+// call blows past TPM (a single 4-ticker call used ~184k tok/min vs a 200k cap).
+const GROUP_SIZE = 2;
+
 async function research() {
   const { default: OpenAI } = await import("openai");
-  const client = new OpenAI({ timeout: 540000, maxRetries: 1 }); // 9 min/call, 1 retry
+  // maxRetries lets the SDK wait out transient 429s at call boundaries.
+  const client = new OpenAI({ timeout: 540000, maxRetries: 4 });
   const candidates = process.env.SIGNAL_MODEL
     ? [{ model: process.env.SIGNAL_MODEL, tool: process.env.SIGNAL_SEARCH_TOOL || "web_search" }]
     : MODEL_CANDIDATES;
 
-  // One combined call for ALL equities (resolves the working model on access
-  // errors), then a separate, lighter call for the MACRO regime. Two calls total
-  // instead of one-per-name — far less repeated prompt + per-call overhead.
-  console.log(`Researching ${STOCK_ORDER.length} equities in one call + MACRO separately`);
-  const stockRun = await researchGroup(client, candidates, STOCK_ORDER);
-  if (stockRun.accessError) {
+  // Equities in small groups, then a separate lighter MACRO call. Far fewer
+  // calls than one-per-name, but small enough to stay under the TPM limit.
+  const groups = [];
+  for (let i = 0; i < STOCK_ORDER.length; i += GROUP_SIZE) {
+    groups.push(STOCK_ORDER.slice(i, i + GROUP_SIZE));
+  }
+  console.log(`Researching equities in ${groups.length} calls of <=${GROUP_SIZE} + MACRO separately`);
+
+  const out = {};
+  // First group resolves the working model (cheap on access errors).
+  const firstRun = await researchGroup(client, candidates, groups[0]);
+  if (firstRun.accessError) {
     let available = "(could not list models)";
     try {
       const list = await client.models.list();
@@ -244,10 +257,16 @@ async function research() {
       `Grant this key's project access to one, or set SIGNAL_MODEL to a model from: ${available}`
     );
   }
-  const pinned = candidates.find((c) => c.model === stockRun.model) || candidates[0];
-  const macroRun = await researchGroup(client, [pinned], ["MACRO"]);
+  const pinned = candidates.find((c) => c.model === firstRun.model) || candidates[0];
+  Object.assign(out, firstRun.stocks);
 
-  const out = { ...stockRun.stocks, ...macroRun.stocks };
+  for (const g of groups.slice(1)) {
+    const r = await researchGroup(client, [pinned], g);
+    Object.assign(out, r.stocks);
+  }
+  const macroRun = await researchGroup(client, [pinned], ["MACRO"]);
+  Object.assign(out, macroRun.stocks);
+
   if (!Object.keys(out).length) throw new Error("No valid data produced for any entry");
   return out;
 }
