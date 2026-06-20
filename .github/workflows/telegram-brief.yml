@@ -1,0 +1,31 @@
+name: Send Telegram brief (manual)
+
+# On-demand brief from the latest committed data — no research, runs in seconds.
+# Use to test Telegram setup or to get a brief whenever you want.
+
+on:
+  workflow_dispatch:
+    inputs:
+      session:
+        description: "morning or close (header label)"
+        type: choice
+        default: morning
+        options: [morning, close]
+
+permissions:
+  contents: read
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Send brief
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          BRIEF_SESSION: ${{ inputs.session }}
+        run: node scripts/telegram-brief.mjs
