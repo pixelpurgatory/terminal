@@ -96,15 +96,6 @@ body {
 .mkt.open { color: var(--green); text-shadow: var(--glow); animation: pulse 1.6s infinite; }
 .mkt.closed { color: var(--ink-dim); }
 .clock { color: var(--ink); font-variant-numeric: tabular-nums; text-shadow: var(--glow); }
-.refresh {
-  background: transparent; color: var(--green); border: 1px solid var(--green-dd);
-  font-family: var(--mono); font-size: 11px; letter-spacing: 1px; padding: 4px 9px;
-  border-radius: 3px; cursor: pointer; transition: background .15s, box-shadow .15s;
-}
-.refresh:hover { background: rgba(0,255,102,.1); box-shadow: var(--glow); }
-.refresh:disabled { opacity: .6; cursor: default; }
-.refresh.spin { animation: spin .8s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
 
 @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.45;} }
 

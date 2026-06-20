@@ -60,31 +60,6 @@
   }
   ingest(window.LIVE_SIGNALS);
 
-  // Re-fetch the committed live-data.js (cache-busted) and re-render. On a
-  // static host there is no backend to trigger a new AI run, so this reloads
-  // the latest committed data; a scheduled run refreshes that twice daily.
-  async function refreshData() {
-    const btn = document.getElementById("refresh-btn");
-    if (btn) { btn.classList.add("spin"); btn.disabled = true; }
-    log("↻ refreshing data …");
-    try {
-      const res = await fetch("js/live-data.js?t=" + Date.now(), { cache: "no-store" });
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const scope = {};
-      new Function("window", await res.text())(scope);
-      ingest(scope.LIVE_SIGNALS || null);
-      buildWatchlist();
-      const rf = $(".rail-foot"); if (rf) rf.innerHTML = feedBadge();
-      selectStock(current);
-      log(LIVE ? `◉ refreshed · feed ${timeAgo(LIVE.generatedAt)} (${LIVE.model})` : "◉ no live data");
-    } catch (e) {
-      log("refresh fetch blocked (" + (e.message || e) + ") · doing full reload");
-      setTimeout(() => location.reload(), 700);
-    } finally {
-      if (btn) { btn.classList.remove("spin"); btn.disabled = false; }
-    }
-  }
-
   let current = STOCK_ORDER[0];
 
   /* ---------- Formatting helpers ---------- */
@@ -531,7 +506,6 @@
     } else if (e.key === "m" || e.key === "M") { selectStock("MACRO"); }
     else if (e.key === "ArrowDown" || e.key === "j") { cycle(1); }
     else if (e.key === "ArrowUp" || e.key === "k") { cycle(-1); }
-    else if (e.key === "r" || e.key === "R") { refreshData(); }
     else if (e.key === "/") { e.preventDefault(); input.focus(); }
   }
 
@@ -593,8 +567,6 @@
 
     setInterval(updateClock, 1000);
     document.addEventListener("keydown", onKey);
-    const rb = document.getElementById("refresh-btn");
-    if (rb) rb.addEventListener("click", refreshData);
 
     boot();
   }

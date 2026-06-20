@@ -54,115 +54,40 @@ const TRENDS = new Set(["up", "down", "flat"]);
 const STANCES = new Set(["bull", "bear", "neutral"]);
 
 /* ---------- Build the research spec from the curated model ---------- */
-function buildSpec(syms = NAV_ORDER) {
-  const spec = {};
-  for (const sym of syms) {
-    const s = STOCKS[sym];
-    spec[sym] = {
-      name: s.name,
-      sector: s.sector,
-      benchmark: s.benchmark,
-      signals: s.signals.map((g) => ({
-        key: g.key,
-        label: g.label,
-        measures: g.note,
-        currentValue: g.value,
-      })),
-    };
-  }
-  return spec;
+// Compact spec: keys/labels/what-each-measures only. We deliberately omit the
+// placeholder currentValue from js/data.js — sending it wastes tokens and would
+// anchor the model to a stale number we want it to re-source from scratch.
+function buildSpec(sym) {
+  const s = STOCKS[sym];
+  return {
+    name: s.name,
+    sector: s.sector,
+    benchmark: s.benchmark,
+    signals: s.signals.map((g) => ({ key: g.key, label: g.label, measures: g.note })),
+  };
 }
 
-/* ---------- Prompt ---------- */
-function buildPrompt(spec) {
-  return `You are a meticulous equity-research analyst updating a live signal terminal.
+/* ---------- Prompt (one entry per call; only the guidance that applies) ----- */
+// Built per-ticker so we never ship MACRO/geopolitical rules to a stock call or
+// sentiment rules to MACRO. JSON is sent compact (no pretty-print) to save tokens.
+function buildPrompt(sym) {
+  const macro = !!(STOCKS[sym] && STOCKS[sym].macro);
+  const spec = buildSpec(sym);
+  const L = [];
+  L.push(`You are a meticulous equity-research analyst updating a live signal terminal. Use the web_search tool to find the most recent real value for EACH signal below. Verify every figure from a recent, credible source (earnings release, 10-Q/10-K/8-K, IR deck, reputable finance/credit news) — never approximate from memory, never reuse a stale number. Assign each signal's stance from its own verified reading, not the overall vibe. OMIT any signal you can't credibly source (never guess).`);
+  L.push(`\n${sym}: ${JSON.stringify(spec)}`);
+  L.push(`\nPer signal return: value (short string WITH units, <=16 chars, e.g. "$462B","+34% YoY","118 bps"), delta (period-over-period change, "" if unknown), trend ("up"|"down"|"flat" = how the metric moved), stance ("bull"|"bear"|"neutral" = what the reading implies for the ${macro ? "RISK-ASSET regime ('bull'=risk-on/supportive, 'bear'=risk-off)" : "BULL thesis on this name"}), raw (0-100 strength for a gauge), note (one sentence <=130 chars).`);
 
-For EACH ticker below, use the web_search tool to find the most recent real-world
-value for each listed signal (latest earnings, filings, market data, credit
-markets, reputable financial news). Prefer the most recent reported figure.
-
-Tickers and the signals to refresh:
-${JSON.stringify(spec, null, 2)}
-
-For every signal, return:
-  value   - the current reading as a short display string WITH units (e.g. "$462B", "+34% YoY", "42.1%", "118 bps")
-  delta   - period-over-period change as a short string (e.g. "+9pp QoQ", "-280bps YoY"); "" if unknown
-  trend   - one of: "up" | "down" | "flat"  (the direction the metric itself moved)
-  stance  - one of: "bull" | "bear" | "neutral"  (REQUIRED — what the CURRENT verified reading
-            implies for the BULL thesis on that name: "bull" supports it, "bear" undercuts it,
-            "neutral" if mixed or roughly in line. Judge each signal independently.)
-  raw     - integer 0-100 expressing how strong/elevated the reading is (for a gauge fill)
-  note    - one concise sentence on what this reading means for the thesis right now
-
-Also return per ticker:
-  price     - latest share price as a number (no currency symbol)
-  changePct - latest daily price change as a signed number in percent (e.g. -1.8 means -1.8%); omit if unknown
-  earnings  - the NEXT scheduled earnings/report date if known, ISO "YYYY-MM-DD"; omit if unknown (omit for MACRO)
-  asOf      - the date your figures reflect, ISO "YYYY-MM-DD"
-  summary  - one sentence: your current read on the name
-  sources  - array of 1-4 source URLs you relied on
-  news     - array of up to 3 of the LATEST breaking-news headlines about this name, most
-             recent first, each { "title": "...", "url": "https://...", "source": "outlet" }.
-             Use reputable, genuinely recent items.
-
-Precision (important):
-- Check EACH signal individually. Verify its current figure from a real, recent source
-  (earnings release, filing, IR deck, reputable finance site) before reporting it — do not
-  approximate from memory or reuse an old number.
-- Assign "stance" per signal from its verified reading, not from the overall vibe on the name.
-
-Coverage (important):
-- Make a genuine effort to find EVERY signal listed for each ticker via search.
-- Most are publicly available: growth rates, margins, backlog/RPO, FCF, capex, gross
-  margin, China/segment sales, subscribers, deposits, volumes, share price + daily
-  change, earnings-estimate revisions, and relative strength vs a sector ETF can all be
-  computed or sourced from earnings releases, 10-Q/10-K/8-K, IR decks, and reputable
-  finance sites. Pull these whenever you can.
-- For market signals that aren't in filings — single-name CDS spread, options IV-rank/skew,
-  notable insider selling, relative strength vs sector — search RECENT NEWS HEADLINES and
-  analyst/credit-market commentary (past few weeks) and report the most recently reported
-  figure, including the source URL and reflecting its date in asOf. For example, Oracle's
-  ~5yr CDS spread is frequently quoted in credit-market news after debt issuance — find the
-  latest cited level.
-- OMIT a signal ONLY when no credible recent source gives a value. Never guess and never
-  carry forward a stale figure — better to omit than to show an outdated or fabricated number.
-
-Sentiment signals (x_sent, reddit_sent, pro_sent):
-- These are SENTIMENT reads, not fundamentals. Set value to a short read (e.g. "Bullish 70%",
-  "Mixed", "Bearish"), stance to bull/bear/neutral matching that sentiment, and note one line
-  citing what you observed (recent X/Twitter posts, Reddit threads, or sell-side ratings/PT
-  changes). They are display-only and do not affect the verdict.
-
-The MACRO entry (cross-asset & geopolitical regime, not a company):
-- Omit price/changePct. For each signal set value to the latest level or a short status,
-  trend to its direction, and stance to the RISK-ASSET implication: "bull" = risk-on /
-  supportive (e.g. easing inflation, falling VIX, lower yields, de-escalation), "bear" =
-  risk-off (e.g. oil spike, rising yields, widening spreads, escalation).
-- For the geopolitical signals (iran, ukraine, cuba, taiwan) summarize the CURRENT situation
-  from the LATEST news headlines, give a short status as value (e.g. "Escalating", "Tense",
-  "Ceasefire talks"), and include the headline source URL.
-
-Formatting:
-- Keep value <= 16 chars and note <= 130 chars. Use the most recent reported figure and
-  reflect its date in the ticker-level asOf.
-- Respond with ONLY a single JSON object, no prose before or after, in this exact shape:
-
-{
-  "stocks": {
-    "TICKER": {
-      "price": 0,
-      "changePct": 0,
-      "earnings": "YYYY-MM-DD",
-      "asOf": "YYYY-MM-DD",
-      "summary": "...",
-      "sources": ["https://..."],
-      "news": [{ "title": "...", "url": "https://...", "source": "outlet" }],
-      "signals": {
-        "signalKey": { "value": "...", "delta": "...", "trend": "up", "stance": "bull", "raw": 0, "note": "..." }
-      }
-    }
+  if (macro) {
+    L.push(`\nMACRO is a cross-asset & geopolitical regime, not a company — omit price/changePct/earnings. For rates/vol/commodities/credit/FX signals give the latest level. For geopolitical signals (iran, ukraine, cuba, taiwan) summarize the CURRENT situation from the LATEST headlines as a short status value (e.g. "Escalating","Tense","Ceasefire talks") and include the headline source URL.`);
+  } else {
+    L.push(`\nAlso return: price (number, no symbol), changePct (signed daily % e.g. -1.8; omit if unknown), earnings (NEXT report date ISO "YYYY-MM-DD"; omit if unknown), asOf (date your figures reflect, ISO), summary (one sentence read on the name), sources (1-4 URLs), news (up to 3 LATEST headlines, most recent first, each {title,url,source}).`);
+    L.push(`\nCoverage: try to source EVERY listed signal. Fundamentals (growth, margins, backlog/RPO, FCF, capex, gross margin, segment/China sales, subs, deposits, volumes, EPS-revision trend, relative strength vs the benchmark ETF) come from filings/IR/finance sites. Market signals not in filings (single-name CDS spread, options IV-rank/skew, insider selling, relative strength) come from recent news/credit-market commentary — e.g. Oracle's ~5yr CDS is quoted in credit news after debt issuance; report the latest cited level with its source.`);
+    L.push(`\nSentiment signals (x_sent, reddit_sent, pro_sent) are display-only reads, not fundamentals: value = short read (e.g. "Bullish 70%","Mixed"), stance matching it, note citing what you saw (recent X/Twitter, Reddit, or sell-side ratings/PT changes).`);
   }
-}`;
+
+  L.push(`\nRespond with ONLY one JSON object, no prose, shape:\n{"stocks":{"${sym}":{${macro ? "" : `"price":0,"changePct":0,"earnings":"YYYY-MM-DD",`}"asOf":"YYYY-MM-DD",${macro ? "" : `"summary":"...","sources":["https://..."],"news":[{"title":"...","url":"https://...","source":"outlet"}],`}"signals":{"signalKey":{"value":"...","delta":"...","trend":"up","stance":"bull","raw":0,"note":"..."}}}}}`);
+  return L.join("\n");
 }
 
 /* ---------- Robust JSON extraction ---------- */
@@ -246,11 +171,11 @@ const isAccessError = (msg) =>
 // returns the validated stock object or null. Much smaller/faster than one
 // mega-call, so it stays well under the request timeout and is more precise.
 async function researchOne(client, candidates, sym) {
-  const input = buildPrompt(buildSpec([sym]));
+  const input = buildPrompt(sym);
   for (const { model, tool } of candidates) {
     try {
       const response = await client.responses.create({
-        model, tools: [{ type: tool }], max_output_tokens: 8000, input,
+        model, tools: [{ type: tool }], max_output_tokens: 5000, input,
       });
       const text = (response.output_text || "").trim();
       if (!text) throw new Error("empty output");
