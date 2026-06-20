@@ -92,6 +92,25 @@ left out (the UI keeps the curated fallback).
    **default branch** (GitHub only schedules from there). You can also trigger it
    anytime via **Actions → "Update signals" → Run workflow**.
 
+### Telegram brief (optional)
+
+The scheduled job can DM you a **detailed brief** twice a day (morning + close):
+macro regime, per-stock verdict/price/top signals, flips since last run, and a
+headline each. To enable, add two repo secrets:
+
+- `TELEGRAM_BOT_TOKEN` — from **@BotFather** (`/newbot`)
+- `TELEGRAM_CHAT_ID` — your numeric id (message **@userinfobot**); **message your
+  bot once first** so it's allowed to DM you.
+
+Preview the message locally without sending (no secrets needed):
+
+```bash
+node scripts/telegram-brief.mjs            # morning preview
+BRIEF_SESSION=close node scripts/telegram-brief.mjs
+```
+
+The send step no-ops if the secrets aren't set, so it never breaks the run.
+
 ### Running the researcher locally
 
 ```bash

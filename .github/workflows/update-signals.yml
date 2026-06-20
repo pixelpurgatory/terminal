@@ -53,3 +53,11 @@ jobs:
             git commit -m "chore: refresh live signals [skip ci]"
             git push
           fi
+
+      - name: Telegram brief
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # Label by which cron fired (post-close vs everything else = morning).
+          BRIEF_SESSION: ${{ github.event.schedule == '0 22 * * 1-5' && 'close' || 'morning' }}
+        run: node scripts/telegram-brief.mjs
