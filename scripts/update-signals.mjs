@@ -45,17 +45,29 @@ const STOCK_ORDER = curated.STOCK_ORDER || [];
 const DRY_RUN = process.argv.includes("--dry-run");
 // full = all signals + price + news (updates the site); news = price + news only.
 const MODE = (process.env.SIGNAL_MODE || "full").toLowerCase() === "news" ? "news" : "full";
-// Web-search-capable models, tried in order, each with its correct tool type
-// (newer models use "web_search"; gpt-4o uses the legacy "web_search_preview").
-// Pin one with SIGNAL_MODEL (tool defaults to web_search; override SIGNAL_SEARCH_TOOL).
-const MODEL_CANDIDATES = [
-  { model: "gpt-5.5", tool: "web_search" },
-  { model: "gpt-5.4-mini", tool: "web_search" },
-  { model: "gpt-4.1", tool: "web_search" },
-  { model: "gpt-4.1-mini", tool: "web_search" },
-  { model: "gpt-4o", tool: "web_search_preview" },
-];
-let usedModel = process.env.SIGNAL_MODEL || MODEL_CANDIDATES[0].model;
+// Web-search-capable models with their correct tool type (newer models use
+// "web_search"; gpt-4o uses the legacy "web_search_preview").
+const MODEL_TOOL = {
+  "gpt-5.5": "web_search",
+  "gpt-5.4-mini": "web_search",
+  "gpt-4.1": "web_search",
+  "gpt-4.1-mini": "web_search",
+  "gpt-4o": "web_search_preview",
+};
+// Candidate order depends on mode (cost optimization):
+//   full — one ticker's signal research is heavy, so prefer gpt-5.5 (TPM headroom).
+//   news — light (price + a few headlines), so prefer the cheapest capable model.
+// Pin one for either mode with SIGNAL_MODEL (override tool via SIGNAL_SEARCH_TOOL).
+const MODEL_ORDER = {
+  full: ["gpt-5.5", "gpt-5.4-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4o"],
+  news: ["gpt-5.4-mini", "gpt-4.1-mini", "gpt-4.1", "gpt-5.5", "gpt-4o"],
+};
+function candidatesFor(mode) {
+  if (process.env.SIGNAL_MODEL)
+    return [{ model: process.env.SIGNAL_MODEL, tool: process.env.SIGNAL_SEARCH_TOOL || "web_search" }];
+  return MODEL_ORDER[mode].map((m) => ({ model: m, tool: MODEL_TOOL[m] }));
+}
+let usedModel = process.env.SIGNAL_MODEL || MODEL_ORDER.full[0];
 
 const TRENDS = new Set(["up", "down", "flat"]);
 const STANCES = new Set(["bull", "bear", "neutral"]);
@@ -85,8 +97,8 @@ function buildPrompt(sym, mode) {
   const L = [];
 
   if (mode === "news") {
-    L.push(`You are a markets news analyst updating a live terminal. Use the web_search tool to find, for ${s.name} (${sym}), the latest share price, today's % change, the NEXT scheduled earnings date, and THE SINGLE most important recent headline. Verify from recent, credible finance sources — never guess, never reuse a stale number.`);
-    L.push(`\nReturn: price (number, no symbol), changePct (signed daily % e.g. -1.8; omit if unknown), earnings (NEXT report date ISO "YYYY-MM-DD"; omit if unknown), asOf (date your figures reflect, ISO), summary (one sentence read on the name today), sources (1-2 URLs), news (ONLY the single most important recent headline, as a one-item array {title,url,source,stance}). stance = how bullish/bearish that news is for the name — one of "strong_bull"|"bull"|"neutral"|"bear"|"strong_bear".`);
+    L.push(`You are a markets news analyst updating a live terminal. Use the web_search tool to find, for ${s.name} (${sym}), the latest share price, today's % change, the NEXT scheduled earnings date, and the 3 most important recent headlines. Verify from recent, credible finance sources — never guess, never reuse a stale number. Be economical: a few quick searches per name, no deep multi-source digging.`);
+    L.push(`\nReturn: price (number, no symbol), changePct (signed daily % e.g. -1.8; omit if unknown), earnings (NEXT report date ISO "YYYY-MM-DD"; omit if unknown), asOf (date your figures reflect, ISO), summary (one sentence read on the name today), sources (1-3 URLs), news (the 3 most important recent headlines, most important first, each {title,url,source,stance}). stance = how bullish/bearish that news is for the name — one of "strong_bull"|"bull"|"neutral"|"bear"|"strong_bear".`);
     const shape = `{"stocks":{"${sym}":{"price":0,"changePct":0,"earnings":"YYYY-MM-DD","asOf":"YYYY-MM-DD","summary":"...","sources":["https://..."],"news":[{"title":"...","url":"https://...","source":"outlet","stance":"bull"}]}}}`;
     L.push(`\nRespond with ONLY one JSON object, no prose, shape:\n${shape}`);
     return L.join("\n");
@@ -97,7 +109,7 @@ function buildPrompt(sym, mode) {
   L.push(`You are a meticulous equity-research analyst updating a live signal terminal. Use the web_search tool to find the most recent real value for EACH signal below. Verify every figure from a recent, credible source (earnings release, 10-Q/10-K/8-K, IR deck, reputable finance/credit news) — never approximate from memory, never reuse a stale number. Assign each signal's stance from its own verified reading, not the overall vibe. OMIT any signal you can't credibly source (never guess).`);
   L.push(`\nTicker and signals to refresh: ${JSON.stringify(spec)}`);
   L.push(`\nPer signal return: value (short string WITH units, <=16 chars, e.g. "$462B","118 bps"), trend ("up"|"down"|"flat" = how the metric moved), stance ("bull"|"bear"|"neutral" = what the reading implies for the BULL thesis on that name), raw (0-100 strength for a gauge), note (one sentence <=130 chars).`);
-  L.push(`\nAlso return PER TICKER: price (number, no symbol), changePct (signed daily % e.g. -1.8; omit if unknown), earnings (NEXT report date ISO "YYYY-MM-DD"; omit if unknown), asOf (date your figures reflect, ISO), summary (one sentence read on the name), sources (1-4 URLs), news (ONLY the single most important recent headline, as a one-item array {title,url,source,stance}). stance = how bullish/bearish that news is for the name — one of "strong_bull"|"bull"|"neutral"|"bear"|"strong_bear".`);
+  L.push(`\nAlso return PER TICKER: price (number, no symbol), changePct (signed daily % e.g. -1.8; omit if unknown), earnings (NEXT report date ISO "YYYY-MM-DD"; omit if unknown), asOf (date your figures reflect, ISO), summary (one sentence read on the name), sources (1-4 URLs), news (the 3 most important recent headlines, most important first, each {title,url,source,stance}). stance = how bullish/bearish that news is for the name — one of "strong_bull"|"bull"|"neutral"|"bear"|"strong_bear".`);
   L.push(`\nCoverage: try to source EVERY listed signal. Fundamentals (growth, margins, backlog/RPO, FCF, capex, gross margin, segment/China sales, subs, deposits, volumes, EPS-revision trend, relative strength vs the benchmark ETF) come from filings/IR/finance sites. Market signals not in filings (options IV-rank/skew, insider selling, relative strength) come from recent finance news/commentary — report the latest cited figure with its source.`);
   L.push(`\nSentiment signals (x_sent, reddit_sent, pro_sent) are display-only reads, not fundamentals: value = short read (e.g. "Bullish 70%","Mixed"), stance matching it, note citing what you saw (recent X/Twitter, Reddit, or sell-side ratings/PT changes).`);
   const shape = `{"stocks":{"${sym}":{"price":0,"changePct":0,"earnings":"YYYY-MM-DD","asOf":"YYYY-MM-DD","summary":"...","sources":["https://..."],"news":[{"title":"...","url":"https://...","source":"outlet","stance":"bull"}],"signals":{"signalKey":{"value":"...","trend":"up","stance":"bull","raw":0,"note":"..."}}}}}`;
@@ -158,7 +170,7 @@ function validateStock(sym, incoming, mode = "full") {
     stock.news = incoming.news
       .filter((n) => n && typeof n.title === "string" && n.title.trim() &&
                      typeof n.url === "string" && /^https?:\/\//.test(n.url))
-      .slice(0, 1)   // only the single most important latest headline
+      .slice(0, 3)   // the 3 most important recent headlines
       .map((n) => {
         const item = {
           title: n.title.trim().slice(0, 160),
@@ -198,16 +210,16 @@ async function researchOne(client, candidates, sym, mode) {
   for (const { model, tool } of candidates) {
     try {
       // Reasoning models (gpt-5.x) spend part of the output budget on hidden
-      // reasoning; cap effort to "medium" (cheaper/faster, still room for JSON).
-      // search_context_size "low" trims how much web content is ingested per
-      // search — the biggest cost lever. (Older models reject reasoning param.)
+      // reasoning, re-counted every search turn — so effort "low" is a big cost
+      // (and TPM) saving. search_context_size "low" likewise trims how much web
+      // content is ingested per search. (Older models reject the reasoning param.)
       const req = {
         model,
         tools: [{ type: tool, search_context_size: "low" }],
         max_output_tokens: maxTokens,
         input,
       };
-      if (/^gpt-5/.test(model)) req.reasoning = { effort: "medium" };
+      if (/^gpt-5/.test(model)) req.reasoning = { effort: "low" };
       const response = await client.responses.create(req);
       const text = (response.output_text || "").trim();
       if (!text) throw new Error("empty output");
@@ -239,9 +251,7 @@ async function mapPool(items, concurrency, fn) {
 async function research(mode) {
   const { default: OpenAI } = await import("openai");
   const client = new OpenAI({ timeout: 540000, maxRetries: 1 }); // 9 min/call, 1 retry
-  const candidates = process.env.SIGNAL_MODEL
-    ? [{ model: process.env.SIGNAL_MODEL, tool: process.env.SIGNAL_SEARCH_TOOL || "web_search" }]
-    : MODEL_CANDIDATES;
+  const candidates = candidatesFor(mode);
 
   // ONE web-search call per ticker. Each call is small, so it stays well under
   // the per-minute token limit — combining names into one call blew past TPM.
