@@ -97,6 +97,7 @@ For every signal, return:
 Also return per ticker:
   price     - latest share price as a number (no currency symbol)
   changePct - latest daily price change as a signed number in percent (e.g. -1.8 means -1.8%); omit if unknown
+  earnings  - the NEXT scheduled earnings/report date if known, ISO "YYYY-MM-DD"; omit if unknown (omit for MACRO)
   asOf      - the date your figures reflect, ISO "YYYY-MM-DD"
   summary  - one sentence: your current read on the name
   sources  - array of 1-4 source URLs you relied on
@@ -151,6 +152,7 @@ Formatting:
     "TICKER": {
       "price": 0,
       "changePct": 0,
+      "earnings": "YYYY-MM-DD",
       "asOf": "YYYY-MM-DD",
       "summary": "...",
       "sources": ["https://..."],
@@ -203,6 +205,9 @@ function validateStock(sym, incoming) {
   if (Number.isFinite(incoming.price)) stock.price = incoming.price;
   if (Number.isFinite(incoming.changePct)) stock.changePct = incoming.changePct;
   if (typeof incoming.asOf === "string") stock.asOf = incoming.asOf.slice(0, 10);
+  if (typeof incoming.earnings === "string" && /^\d{4}-\d{2}-\d{2}$/.test(incoming.earnings.trim())) {
+    stock.earnings = incoming.earnings.trim();
+  }
   if (typeof incoming.summary === "string") stock.summary = incoming.summary.trim().slice(0, 240);
   if (Array.isArray(incoming.sources)) {
     stock.sources = incoming.sources
@@ -313,8 +318,10 @@ function mock() {
   for (const sym of NAV_ORDER) {
     const s = STOCKS[sym];
     const signals = {};
-    for (const g of s.signals) {
-      // Reuse curated readings with a tiny nudge to raw so output visibly differs.
+    s.signals.forEach((g, gi) => {
+      const base = parseNum(g.value) ?? 50;
+      const hist = Array.from({ length: 12 }, (_, k) =>
+        Math.round((base * (1 + Math.sin((k + gi) * 0.6) * 0.06)) * 100) / 100);
       signals[g.key] = {
         value: g.value,
         delta: g.delta,
@@ -322,11 +329,18 @@ function mock() {
         stance: g.stance,
         raw: Math.max(0, Math.min(100, g.raw + (Math.random() < 0.5 ? -3 : 3))),
         note: g.note,
+        hist,
+        // Flag the first signal of each name as "changed" to exercise the alerts UI.
+        ...(gi === 0 ? { stanceFrom: g.stance === "bull" ? "bear" : "bull", valueFrom: "prev" } : {}),
       };
-    }
+    });
+    const base = s.price || 100;
     out[sym] = {
       price: s.price,
       changePct: Math.round((Math.random() - 0.5) * 60) / 10,
+      earnings: new Date(Date.now() + (3 + Math.floor(Math.random() * 40)) * 864e5).toISOString().slice(0, 10),
+      priceHist: s.price ? Array.from({ length: 20 }, (_, k) =>
+        Math.round(base * (1 + Math.sin(k * 0.5) * 0.04) * 100) / 100) : undefined,
       asOf: new Date().toISOString().slice(0, 10),
       summary: `[MOCK] ${s.tag} — dry-run synthesized snapshot.`,
       sources: ["https://example.com/mock-source"],
@@ -341,8 +355,59 @@ function mock() {
   return out;
 }
 
+/* ---------- History + change detection (run-over-run) ---------- */
+const HIST_LEN = 30;
+
+// Pull the first numeric token out of a value string for sparkline history
+// ("$638B" -> 638, "+93% YoY" -> 93, "175 bps" -> 175, "SPY $747.31" -> 747.31).
+function parseNum(v) {
+  if (typeof v !== "string") return null;
+  const m = v.replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
+  return m ? Number(m[0]) : null;
+}
+
+function loadPrevious() {
+  try {
+    const code = readFileSync(resolve(ROOT, "js/live-data.js"), "utf8");
+    const scope = {};
+    new Function("window", code)(scope);
+    return (scope.LIVE_SIGNALS && scope.LIVE_SIGNALS.stocks) ? scope.LIVE_SIGNALS : null;
+  } catch { return null; }
+}
+
+// Append this run's values to per-signal history and flag what changed vs the
+// previous run (stance flips + value changes), so the UI can chart trends and
+// surface a "what changed" strip.
+function mergeHistory(stocks) {
+  const prev = loadPrevious();
+  for (const sym of Object.keys(stocks)) {
+    const s = stocks[sym];
+    const ps = prev && prev.stocks && prev.stocks[sym];
+    if (Number.isFinite(s.price)) {
+      const ph = (ps && Array.isArray(ps.priceHist)) ? ps.priceHist.slice() : [];
+      ph.push(s.price);
+      s.priceHist = ph.slice(-HIST_LEN);
+    } else if (ps && Array.isArray(ps.priceHist)) {
+      s.priceHist = ps.priceHist.slice(-HIST_LEN);
+    }
+    for (const key of Object.keys(s.signals)) {
+      const sig = s.signals[key];
+      const psig = ps && ps.signals && ps.signals[key];
+      const num = parseNum(sig.value);
+      const hist = (psig && Array.isArray(psig.hist)) ? psig.hist.slice() : [];
+      if (num != null) hist.push(num);
+      sig.hist = hist.slice(-HIST_LEN);
+      if (psig) {
+        if (psig.value !== undefined && psig.value !== sig.value) sig.valueFrom = psig.value;
+        if (psig.stance && psig.stance !== sig.stance) sig.stanceFrom = psig.stance;
+      }
+    }
+  }
+}
+
 /* ---------- Write outputs ---------- */
 function writeOutputs(stocks) {
+  if (!DRY_RUN) mergeHistory(stocks); // accumulate trends + change flags on live runs
   const payload = {
     generatedAt: new Date().toISOString(),
     model: DRY_RUN ? "dry-run-mock" : usedModel,

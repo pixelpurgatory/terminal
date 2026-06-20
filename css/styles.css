@@ -135,7 +135,7 @@ body {
 .wl-row {
   display: grid;
   grid-template-columns: 1fr auto;
-  grid-template-areas: "main quote" "sub spark";
+  grid-template-areas: "main quote" "sub quote" "spark spark";
   gap: 2px 8px;
   width: 100%;
   text-align: left;
@@ -168,7 +168,31 @@ body {
 .wl-price { color: var(--white); font-variant-numeric: tabular-nums; font-weight: 600; }
 .wl-chg { font-size: 11px; font-variant-numeric: tabular-nums; }
 .wl-chg.up { color: var(--green); } .wl-chg.down { color: var(--red); }
-.wl-spark { grid-area: spark; width: 100%; height: 22px; }
+.wl-quote { align-self: center; }
+.wl-spark { grid-area: spark; width: 100%; height: 20px; margin-top: 5px; opacity: .85; }
+.wl-flag { font-size: 9px; color: var(--amber); border: 1px solid rgba(255,204,51,.45); border-radius: 2px; padding: 0 4px; letter-spacing: .5px; }
+
+/* ----- Sparkline + change markers on cards ----- */
+.card-spark { width: 100%; height: 26px; display: block; margin: 2px 0 6px; }
+.card.changed { border-color: var(--amber); box-shadow: 0 0 0 1px rgba(255,204,51,.25), inset 0 0 18px rgba(255,204,51,.05); animation: changedPulse 2.4s ease-in-out 3; }
+@keyframes changedPulse { 0%,100% { box-shadow: 0 0 0 1px rgba(255,204,51,.2), inset 0 0 18px rgba(255,204,51,.04); } 50% { box-shadow: 0 0 12px rgba(255,204,51,.5), inset 0 0 22px rgba(255,204,51,.1); } }
+.card-change { display: inline-block; margin-top: 6px; font-size: 9.5px; letter-spacing: .5px; padding: 1px 6px; border-radius: 2px; background: rgba(255,204,51,.12); color: var(--amber); border: 1px solid rgba(255,204,51,.4); }
+.card-change.up { color: var(--green); border-color: var(--green-dd); background: rgba(0,255,102,.1); }
+.card-change.down { color: var(--red); border-color: rgba(255,59,92,.4); background: rgba(255,59,92,.1); }
+.card-change.flip { color: var(--bg); background: var(--amber); font-weight: 700; }
+
+/* ----- What-changed alerts strip ----- */
+.alerts { margin-top: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 10px; border: 1px solid rgba(255,204,51,.35); border-radius: 3px; background: rgba(255,204,51,.05); }
+.alerts-tag { font-size: 10px; letter-spacing: 1px; color: var(--amber); font-weight: 700; white-space: nowrap; }
+.alert { font-size: 11px; color: var(--ink); border: 1px solid var(--green-dd); border-radius: 3px; padding: 2px 7px; }
+.alert b { color: var(--ink-dim); font-weight: 400; margin-right: 4px; }
+.alert.bull { border-color: rgba(0,255,102,.45); } .alert.bear { border-color: rgba(255,59,92,.45); }
+.alert.up { color: var(--green); } .alert.down { color: var(--red); }
+
+/* ----- Earnings countdown ----- */
+.dt-earn { font-size: 11px; color: var(--ink-dim); margin-top: 3px; }
+.dt-earn b { color: var(--ink); }
+.dt-earn.soon { color: var(--amber); text-shadow: var(--glow); }
 
 /* macro divider + row */
 .wl-divider {

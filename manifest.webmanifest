@@ -1,0 +1,14 @@
+{
+  "name": "Matrix Stocks Terminal",
+  "short_name": "MATRIX",
+  "description": "Matrix-style AI equity signal terminal — ORCL, MSFT, HOOD, NKE, GEV + macro regime.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#020804",
+  "theme_color": "#00ff66",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

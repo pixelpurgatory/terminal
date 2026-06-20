@@ -6,7 +6,10 @@
   <title>MATRIX // STOCKS TERMINAL</title>
   <meta name="description" content="A Matrix-style equity signal terminal: ORCL · MSFT · HOOD · NKE · GEV." />
   <link rel="stylesheet" href="css/styles.css" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>📈</text></svg>" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#00ff66" />
+  <link rel="icon" href="icons/icon.svg" />
+  <link rel="apple-touch-icon" href="icons/icon.svg" />
 </head>
 <body>
   <!-- Matrix rain backdrop -->
@@ -70,5 +73,10 @@
   <script src="js/live-data.js"></script>
   <script src="js/matrix.js"></script>
   <script src="js/app.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+    }
+  </script>
 </body>
 </html>
