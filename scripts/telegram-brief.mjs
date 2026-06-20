@@ -46,6 +46,19 @@ const LIVE = loadLive();
 
 const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 const STANCE = { bull: "🟢", bear: "🔴", neutral: "🟡" };
+// Per-headline bull/bear rating (strong bear → strong bull).
+const NEWS_TAG = {
+  strong_bull: "🟢🟢 STRONG BULL",
+  bull: "🟢 BULL",
+  neutral: "⚪ NEUTRAL",
+  bear: "🔴 BEAR",
+  strong_bear: "🔴🔴 STRONG BEAR",
+};
+// One formatted headline line, prefixed with its bull/bear rating when present.
+function newsLine(n) {
+  const tag = NEWS_TAG[n.stance];
+  return `📰 ${tag ? `<b>[${tag}]</b> ` : ""}<a href="${esc(n.url)}">${esc(n.title)}</a>`;
+}
 const isMacro = (sym) => !!(STOCKS[sym] && STOCKS[sym].macro);
 
 // live signal object for a key (with curated label/weight), or null
@@ -132,7 +145,7 @@ function build() {
     L.push(`${dot} <b>Regime: ${esc(mv.label)}</b>`);
     macroCh.forEach(({ g, c }) =>
       L.push(`${c.kind === "flip" ? "⚡" : (c.dir === "up" ? "🔼" : "🔽")} ${esc(g.label)}: <b>${esc(g.value)}</b> (${esc(c.text)})`));
-    freshNews(LIVE.stocks.MACRO).forEach((n) => L.push(`📰 <a href="${esc(n.url)}">${esc(n.title)}</a>`));
+    freshNews(LIVE.stocks.MACRO).forEach((n) => L.push(newsLine(n)));
     if (!macroCh.length && !freshNews(LIVE.stocks.MACRO).length) L.push("<i>No macro changes.</i>");
   }
 
@@ -154,7 +167,7 @@ function build() {
     }
     stockCh[sym].forEach(({ g, c }) =>
       L.push(`${c.kind === "flip" ? "⚡" : (c.dir === "up" ? "🔼" : "🔽")} ${esc(g.label)}: <b>${esc(g.value)}</b> (${esc(c.text)})`));
-    freshNews(st).forEach((n) => L.push(`📰 <a href="${esc(n.url)}">${esc(n.title)}</a>`));
+    freshNews(st).forEach((n) => L.push(newsLine(n)));
   }
 
   L.push("");

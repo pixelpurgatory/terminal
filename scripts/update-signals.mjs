@@ -52,6 +52,8 @@ let usedModel = process.env.SIGNAL_MODEL || MODEL_CANDIDATES[0].model;
 
 const TRENDS = new Set(["up", "down", "flat"]);
 const STANCES = new Set(["bull", "bear", "neutral"]);
+// Per-headline bull/bear rating on a 5-point scale (shown in the Telegram brief).
+const NEWS_STANCES = new Set(["strong_bull", "bull", "neutral", "bear", "strong_bear"]);
 
 /* ---------- Build the research spec from the curated model ---------- */
 // Compact spec: keys/labels/what-each-measures only. We deliberately omit the
@@ -82,14 +84,14 @@ function buildPrompt(syms) {
   if (macro) {
     L.push(`\nMACRO is a cross-asset & geopolitical regime, not a company — omit price/changePct/earnings. For rates/vol/commodities/credit/FX signals give the latest level. Keep geopolitical signals (iran, ukraine, taiwan) CHEAP: do ONE quick search each for only the single latest BREAKING headline, report a short status as value (e.g. "Escalating","Tense","Ceasefire talks") with that headline's source URL — no deep multi-source research.`);
   } else {
-    L.push(`\nAlso return PER TICKER: price (number, no symbol), changePct (signed daily % e.g. -1.8; omit if unknown), earnings (NEXT report date ISO "YYYY-MM-DD"; omit if unknown), asOf (date your figures reflect, ISO), summary (one sentence read on the name), sources (1-4 URLs), news (up to 3 LATEST headlines, most recent first, each {title,url,source}).`);
+    L.push(`\nAlso return PER TICKER: price (number, no symbol), changePct (signed daily % e.g. -1.8; omit if unknown), earnings (NEXT report date ISO "YYYY-MM-DD"; omit if unknown), asOf (date your figures reflect, ISO), summary (one sentence read on the name), sources (1-4 URLs), news (up to 3 LATEST headlines, most recent first, each {title,url,source,stance}). For each headline, stance = how bullish/bearish that news is for the name — one of "strong_bull"|"bull"|"neutral"|"bear"|"strong_bear".`);
     L.push(`\nCoverage: try to source EVERY listed signal. Fundamentals (growth, margins, backlog/RPO, FCF, capex, gross margin, segment/China sales, subs, deposits, volumes, EPS-revision trend, relative strength vs the benchmark ETF) come from filings/IR/finance sites. Market signals not in filings (options IV-rank/skew, insider selling, relative strength) come from recent finance news/commentary — report the latest cited figure with its source.`);
     L.push(`\nSentiment signals (x_sent, reddit_sent, pro_sent) are display-only reads, not fundamentals: value = short read (e.g. "Bullish 70%","Mixed"), stance matching it, note citing what you saw (recent X/Twitter, Reddit, or sell-side ratings/PT changes).`);
   }
 
   const shape = macro
     ? `{"stocks":{"${syms[0]}":{"asOf":"YYYY-MM-DD","signals":{"signalKey":{"value":"...","delta":"...","trend":"up","stance":"bull","raw":0,"note":"..."}}}}}`
-    : `{"stocks":{"TICKER":{"price":0,"changePct":0,"earnings":"YYYY-MM-DD","asOf":"YYYY-MM-DD","summary":"...","sources":["https://..."],"news":[{"title":"...","url":"https://...","source":"outlet"}],"signals":{"signalKey":{"value":"...","delta":"...","trend":"up","stance":"bull","raw":0,"note":"..."}}}}}`;
+    : `{"stocks":{"TICKER":{"price":0,"changePct":0,"earnings":"YYYY-MM-DD","asOf":"YYYY-MM-DD","summary":"...","sources":["https://..."],"news":[{"title":"...","url":"https://...","source":"outlet","stance":"bull"}],"signals":{"signalKey":{"value":"...","delta":"...","trend":"up","stance":"bull","raw":0,"note":"..."}}}}}`;
   L.push(`\nRespond with ONLY one JSON object, no prose, with a "stocks" map keyed by ticker symbol${macro ? "" : " (one entry per ticker above)"}, shape:\n${shape}`);
   return L.join("\n");
 }
@@ -148,11 +150,15 @@ function validateStock(sym, incoming) {
       .filter((n) => n && typeof n.title === "string" && n.title.trim() &&
                      typeof n.url === "string" && /^https?:\/\//.test(n.url))
       .slice(0, 3)
-      .map((n) => ({
-        title: n.title.trim().slice(0, 160),
-        url: n.url,
-        source: typeof n.source === "string" ? n.source.trim().slice(0, 40) : "",
-      }));
+      .map((n) => {
+        const item = {
+          title: n.title.trim().slice(0, 160),
+          url: n.url,
+          source: typeof n.source === "string" ? n.source.trim().slice(0, 40) : "",
+        };
+        if (NEWS_STANCES.has(n.stance)) item.stance = n.stance;
+        return item;
+      });
   }
   return Object.keys(signals).length ? stock : null;
 }
@@ -281,6 +287,7 @@ function mock() {
         title: `[MOCK] ${sym} breaking headline ${i}`,
         url: "https://example.com/" + sym.toLowerCase() + "/" + i,
         source: "Mock Wire",
+        stance: ["strong_bull", "bull", "neutral", "bear", "strong_bear"][(i - 1) % 5],
       })),
       signals,
     };
