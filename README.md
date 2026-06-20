@@ -47,7 +47,7 @@ one-time toggle (the repo's CI token can't enable Pages on its own):
 > branch **`claude/matrix-stocks-terminal-v8u4pp`**, folder **`/ (root)`** → Save.
 
 In branch mode GitHub serves the site directly and **rebuilds on every commit** —
-so the twice-daily AI data refresh shows up automatically, no extra workflow.
+so the daily AI data refresh shows up automatically, no extra workflow.
 
 ## Run it locally
 
@@ -64,7 +64,7 @@ python3 -m http.server 8080   # then visit http://localhost:8080
 ## Self-updating AI feed
 
 The terminal can refresh its own signals. A research agent lives in the repo and
-runs **twice a day** (GitHub Actions cron): it calls **OpenAI (Responses API)
+runs **once a day, ~1 hour before the US market open** (GitHub Actions cron): it calls **OpenAI (Responses API)
 with web search** — trying `gpt-5.5` → `gpt-4.1` → `gpt-4.1-mini` and using the
 first your project can access (or pin one with the `SIGNAL_MODEL` env var). It looks up the latest real-world value for every
 signal defined in `js/data.js`, and commits the result to `js/live-data.js`. The terminal loads
@@ -74,7 +74,7 @@ links. There is no simulated price tape and no synthetic charts; if the feed is
 missing, the terminal shows a **`◉ NO LIVE DATA`** notice rather than fake values.
 
 ```
-GitHub Actions (cron, 2×/day)
+GitHub Actions (cron, 1×/day, ~1h pre-open)
    └─ node scripts/update-signals.mjs        # OpenAI + web_search
         └─ writes js/live-data.js + data/live.json, commits them
              └─ the terminal loads js/live-data.js and overlays the values
@@ -94,7 +94,7 @@ left out (the UI keeps the curated fallback).
 
 ### Telegram brief (optional)
 
-The scheduled job can DM you a **detailed brief** twice a day (morning + close):
+The scheduled job can DM you a **detailed brief** once a day (~1h before the open):
 macro regime, per-stock verdict/price/top signals, flips since last run, and a
 headline each. To enable, add two repo secrets:
 

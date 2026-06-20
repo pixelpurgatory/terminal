@@ -1,7 +1,7 @@
 /* =============================================================================
  *  MATRIX TERMINAL  ·  SELF-UPDATING SIGNAL RESEARCHER
  *  -----------------------------------------------------------------------------
- *  Runs on a schedule (GitHub Actions, twice a day). Uses OpenAI (Responses API
+ *  Runs on a schedule (GitHub Actions, once a day ~1h before the US open). Uses OpenAI (Responses API
  *  with the web_search tool) to research current values for each thesis signal
  *  defined in js/data.js, then writes js/live-data.js (loaded by the terminal)
  *  and data/live.json (a human-readable record).
