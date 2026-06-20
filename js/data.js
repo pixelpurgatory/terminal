@@ -75,10 +75,6 @@ const STOCKS = {
         delta: "+34bps spread", trend: "down", stance: "bear", weight: 2,
         note: "Long bond cheapening + spread widening = credit market pricing buildout risk.",
         spark: SPARK(101, 94.1, 24, 0.05) },
-      { key: "spread", label: "5yr Credit Spread (CDS)", group: "Cash & Credit", value: "118 bps", raw: 41,
-        delta: "+22bps MoM", trend: "up", stance: "bear", weight: 2,
-        note: "Spreads grinding wider — the bond market's vote on execution risk.",
-        spark: SPARK(82, 118, 24, 0.09) },
       { key: "power", label: "Contracted DC Power", group: "Capacity", value: "4.6 GW", raw: 76,
         delta: "+1.9 GW QoQ", trend: "up", stance: "bull", weight: 2,
         note: "Power is the real constraint on cloud; secured GW de-risks the backlog.",
@@ -276,22 +272,16 @@ const STOCKS = {
     thesis:
       "The cross-asset and geopolitical regime every single-name thesis trades inside. " +
       "Rates, the dollar, oil, credit and volatility set risk appetite; live geopolitical " +
-      "flashpoints (Iran, Ukraine, Cuba, Taiwan) drive the tail risks. Stance is read as " +
+      "flashpoints (Iran, Ukraine, Taiwan) drive the tail risks. Stance is read as " +
       "risk-on (bull) vs risk-off (bear).",
     signals: [
       // --- Rates & Policy ---
       { key: "us10y", label: "US 10Y Yield", group: "Rates & Policy", weight: 3,
         value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
         note: "Latest 10-year Treasury yield; a sharp rise tightens conditions (risk-off)." },
-      { key: "curve", label: "2s10s Curve", group: "Rates & Policy", weight: 2,
-        value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
-        note: "10Y minus 2Y in bps; deep inversion is a recession signal (risk-off)." },
       { key: "fed", label: "Fed Policy Stance", group: "Rates & Policy", weight: 2,
         value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
         note: "Current Fed stance from the latest FOMC / headlines: cutting (bull) vs hiking (bear)." },
-      { key: "cpi", label: "CPI Inflation", group: "Rates & Policy", weight: 2,
-        value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
-        note: "Latest US CPI YoY; cooling supports risk (bull), reacceleration is bearish." },
       // --- Equity & Vol ---
       { key: "spx", label: "S&P 500", group: "Equity & Vol", weight: 3,
         value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
@@ -303,12 +293,6 @@ const STOCKS = {
       { key: "wti", label: "WTI Crude Oil", group: "Commodities", weight: 3,
         value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
         note: "Latest WTI crude ($/bbl); a spike feeds inflation and geopolitical risk (bearish for risk assets)." },
-      { key: "brent", label: "Brent Crude", group: "Commodities", weight: 1,
-        value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
-        note: "Latest Brent crude ($/bbl); the global oil benchmark and geopolitical barometer." },
-      { key: "gold", label: "Gold", group: "Commodities", weight: 1,
-        value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
-        note: "Latest gold ($/oz); a sharp rally often signals risk-off hedging." },
       // --- Credit & FX ---
       { key: "dxy", label: "US Dollar (DXY)", group: "Credit & FX", weight: 2,
         value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
@@ -316,16 +300,13 @@ const STOCKS = {
       { key: "hy", label: "US HY Credit Spread", group: "Credit & FX", weight: 2,
         value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
         note: "Latest US high-yield OAS in bps; widening = risk-off, tightening = risk-on." },
-      // --- Geopolitical Risk (from latest headlines) ---
+      // --- Geopolitical Risk (latest BREAKING headline only) ---
       { key: "iran", label: "Iran", group: "Geopolitical Risk", weight: 2,
         value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
         note: "Current US/Israel–Iran tension from the latest headlines; escalation = risk-off (bear)." },
       { key: "ukraine", label: "Ukraine / Russia", group: "Geopolitical Risk", weight: 2,
         value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
         note: "Current Russia–Ukraine war status from the latest headlines; escalation = risk-off (bear)." },
-      { key: "cuba", label: "Cuba", group: "Geopolitical Risk", weight: 1,
-        value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
-        note: "Current US–Cuba tensions / sanctions developments from the latest headlines." },
       { key: "taiwan", label: "Taiwan", group: "Geopolitical Risk", weight: 2,
         value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
         note: "Current China–Taiwan tension level from the latest headlines; escalation = risk-off (bear)." },

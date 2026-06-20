@@ -7,8 +7,8 @@
  *  and data/live.json (a human-readable record).
  *
  *  The curated model in js/data.js is the single source of truth for WHICH
- *  signals exist; this script researches their VALUES one ticker at a time.
- *  Anything the model can't verify is omitted (never faked); the UI shows only
+ *  signals exist; this script researches their VALUES in two calls (all equities
+ *  together, then the MACRO regime). Anything the model can't verify is omitted (never faked); the UI shows only
  *  the signals that came back with a real value.
  *
  *  Usage:
@@ -67,26 +67,30 @@ function buildSpec(sym) {
   };
 }
 
-/* ---------- Prompt (one entry per call; only the guidance that applies) ----- */
-// Built per-ticker so we never ship MACRO/geopolitical rules to a stock call or
-// sentiment rules to MACRO. JSON is sent compact (no pretty-print) to save tokens.
-function buildPrompt(sym) {
-  const macro = !!(STOCKS[sym] && STOCKS[sym].macro);
-  const spec = buildSpec(sym);
+/* ---------- Prompt ---------- */
+// One call covers ALL equities together (cheaper than one call per name); MACRO
+// is its own call with its own, lighter rules. JSON is sent compact to save tokens.
+function buildPrompt(syms) {
+  const macro = syms.length === 1 && !!(STOCKS[syms[0]] && STOCKS[syms[0]].macro);
+  const specs = {};
+  for (const sym of syms) specs[sym] = buildSpec(sym);
   const L = [];
   L.push(`You are a meticulous equity-research analyst updating a live signal terminal. Use the web_search tool to find the most recent real value for EACH signal below. Verify every figure from a recent, credible source (earnings release, 10-Q/10-K/8-K, IR deck, reputable finance/credit news) — never approximate from memory, never reuse a stale number. Assign each signal's stance from its own verified reading, not the overall vibe. OMIT any signal you can't credibly source (never guess).`);
-  L.push(`\n${sym}: ${JSON.stringify(spec)}`);
-  L.push(`\nPer signal return: value (short string WITH units, <=16 chars, e.g. "$462B","+34% YoY","118 bps"), delta (period-over-period change, "" if unknown), trend ("up"|"down"|"flat" = how the metric moved), stance ("bull"|"bear"|"neutral" = what the reading implies for the ${macro ? "RISK-ASSET regime ('bull'=risk-on/supportive, 'bear'=risk-off)" : "BULL thesis on this name"}), raw (0-100 strength for a gauge), note (one sentence <=130 chars).`);
+  L.push(`\n${macro ? "Entry" : (syms.length > 1 ? syms.length + " tickers" : "Ticker")} and signals to refresh: ${JSON.stringify(specs)}`);
+  L.push(`\nPer signal return: value (short string WITH units, <=16 chars, e.g. "$462B","+34% YoY","118 bps"), delta (period-over-period change, "" if unknown), trend ("up"|"down"|"flat" = how the metric moved), stance ("bull"|"bear"|"neutral" = what the reading implies for the ${macro ? "RISK-ASSET regime ('bull'=risk-on/supportive, 'bear'=risk-off)" : "BULL thesis on that name"}), raw (0-100 strength for a gauge), note (one sentence <=130 chars).`);
 
   if (macro) {
-    L.push(`\nMACRO is a cross-asset & geopolitical regime, not a company — omit price/changePct/earnings. For rates/vol/commodities/credit/FX signals give the latest level. For geopolitical signals (iran, ukraine, cuba, taiwan) summarize the CURRENT situation from the LATEST headlines as a short status value (e.g. "Escalating","Tense","Ceasefire talks") and include the headline source URL.`);
+    L.push(`\nMACRO is a cross-asset & geopolitical regime, not a company — omit price/changePct/earnings. For rates/vol/commodities/credit/FX signals give the latest level. Keep geopolitical signals (iran, ukraine, taiwan) CHEAP: do ONE quick search each for only the single latest BREAKING headline, report a short status as value (e.g. "Escalating","Tense","Ceasefire talks") with that headline's source URL — no deep multi-source research.`);
   } else {
-    L.push(`\nAlso return: price (number, no symbol), changePct (signed daily % e.g. -1.8; omit if unknown), earnings (NEXT report date ISO "YYYY-MM-DD"; omit if unknown), asOf (date your figures reflect, ISO), summary (one sentence read on the name), sources (1-4 URLs), news (up to 3 LATEST headlines, most recent first, each {title,url,source}).`);
-    L.push(`\nCoverage: try to source EVERY listed signal. Fundamentals (growth, margins, backlog/RPO, FCF, capex, gross margin, segment/China sales, subs, deposits, volumes, EPS-revision trend, relative strength vs the benchmark ETF) come from filings/IR/finance sites. Market signals not in filings (single-name CDS spread, options IV-rank/skew, insider selling, relative strength) come from recent news/credit-market commentary — e.g. Oracle's ~5yr CDS is quoted in credit news after debt issuance; report the latest cited level with its source.`);
+    L.push(`\nAlso return PER TICKER: price (number, no symbol), changePct (signed daily % e.g. -1.8; omit if unknown), earnings (NEXT report date ISO "YYYY-MM-DD"; omit if unknown), asOf (date your figures reflect, ISO), summary (one sentence read on the name), sources (1-4 URLs), news (up to 3 LATEST headlines, most recent first, each {title,url,source}).`);
+    L.push(`\nCoverage: try to source EVERY listed signal. Fundamentals (growth, margins, backlog/RPO, FCF, capex, gross margin, segment/China sales, subs, deposits, volumes, EPS-revision trend, relative strength vs the benchmark ETF) come from filings/IR/finance sites. Market signals not in filings (options IV-rank/skew, insider selling, relative strength) come from recent finance news/commentary — report the latest cited figure with its source.`);
     L.push(`\nSentiment signals (x_sent, reddit_sent, pro_sent) are display-only reads, not fundamentals: value = short read (e.g. "Bullish 70%","Mixed"), stance matching it, note citing what you saw (recent X/Twitter, Reddit, or sell-side ratings/PT changes).`);
   }
 
-  L.push(`\nRespond with ONLY one JSON object, no prose, shape:\n{"stocks":{"${sym}":{${macro ? "" : `"price":0,"changePct":0,"earnings":"YYYY-MM-DD",`}"asOf":"YYYY-MM-DD",${macro ? "" : `"summary":"...","sources":["https://..."],"news":[{"title":"...","url":"https://...","source":"outlet"}],`}"signals":{"signalKey":{"value":"...","delta":"...","trend":"up","stance":"bull","raw":0,"note":"..."}}}}}`);
+  const shape = macro
+    ? `{"stocks":{"${syms[0]}":{"asOf":"YYYY-MM-DD","signals":{"signalKey":{"value":"...","delta":"...","trend":"up","stance":"bull","raw":0,"note":"..."}}}}}`
+    : `{"stocks":{"TICKER":{"price":0,"changePct":0,"earnings":"YYYY-MM-DD","asOf":"YYYY-MM-DD","summary":"...","sources":["https://..."],"news":[{"title":"...","url":"https://...","source":"outlet"}],"signals":{"signalKey":{"value":"...","delta":"...","trend":"up","stance":"bull","raw":0,"note":"..."}}}}}`;
+  L.push(`\nRespond with ONLY one JSON object, no prose, with a "stocks" map keyed by ticker symbol${macro ? "" : " (one entry per ticker above)"}, shape:\n${shape}`);
   return L.join("\n");
 }
 
@@ -167,46 +171,47 @@ function pickStock(parsed, sym) {
 const isAccessError = (msg) =>
   /does not have access|model.*not found|unknown model|no such model|\b40[34]\b/i.test(msg);
 
-// Research ONE ticker. Tries the model candidates (cheap on access errors) and
-// returns the validated stock object or null. Much smaller/faster than one
-// mega-call, so it stays well under the request timeout and is more precise.
-async function researchOne(client, candidates, sym) {
-  const input = buildPrompt(sym);
+// Research a GROUP of entries in a SINGLE call (all equities together, or MACRO
+// alone). Tries the model candidates (cheap on access errors). Returns the
+// validated stock objects keyed by symbol. Search depth is kept low to save cost.
+async function researchGroup(client, candidates, syms) {
+  const input = buildPrompt(syms);
+  // max_output_tokens is a CAP, not a charge — billing is per token actually
+  // produced — so scale generous headroom by group size to avoid truncated JSON.
+  const maxTokens = Math.min(30000, 8000 + syms.length * 4000);
   for (const { model, tool } of candidates) {
     try {
-      // max_output_tokens is a CAP, not a charge — billing is per token actually
-      // produced, so we keep generous headroom to avoid truncated JSON. Reasoning
-      // models (gpt-5.x) spend part of this budget on hidden reasoning, so cap the
-      // effort to "medium": cheaper/faster and still leaves room for the full JSON.
-      // (Older models reject the reasoning param, so only send it for gpt-5.x.)
-      const req = { model, tools: [{ type: tool }], max_output_tokens: 16000, input };
+      // Reasoning models (gpt-5.x) spend part of the output budget on hidden
+      // reasoning; cap effort to "medium" (cheaper/faster, still room for JSON).
+      // search_context_size "low" trims how much web content is ingested per
+      // search — the biggest cost lever. (Older models reject reasoning param.)
+      const req = {
+        model,
+        tools: [{ type: tool, search_context_size: "low" }],
+        max_output_tokens: maxTokens,
+        input,
+      };
       if (/^gpt-5/.test(model)) req.reasoning = { effort: "medium" };
       const response = await client.responses.create(req);
       const text = (response.output_text || "").trim();
       if (!text) throw new Error("empty output");
       usedModel = model;
-      const stock = validateStock(sym, pickStock(extractJson(text), sym));
-      console.log(`  ${sym}: ${stock ? Object.keys(stock.signals).length + " signals" : "no data"} (${model})`);
-      return { sym, stock, model };
+      const parsed = extractJson(text);
+      const stocks = {};
+      for (const sym of syms) {
+        const stock = validateStock(sym, pickStock(parsed, sym));
+        if (stock) stocks[sym] = stock;
+        console.log(`  ${sym}: ${stock ? Object.keys(stock.signals).length + " signals" : "no data"} (${model})`);
+      }
+      return { stocks, model, accessError: false };
     } catch (err) {
       const msg = err?.message || String(err);
       if (isAccessError(msg)) { continue; } // try next candidate
-      console.warn(`  ${sym}: failed on ${model} — ${msg}`);
-      return { sym, stock: null, accessError: false };
+      console.warn(`  group [${syms.join(",")}] failed on ${model} — ${msg}`);
+      return { stocks: {}, model, accessError: false };
     }
   }
-  return { sym, stock: null, accessError: true };
-}
-
-// Run fn over items with bounded concurrency (fast, but gentle on rate limits).
-async function mapPool(items, concurrency, fn) {
-  const out = new Array(items.length);
-  let i = 0;
-  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-    while (i < items.length) { const idx = i++; out[idx] = await fn(items[idx], idx); }
-  });
-  await Promise.all(workers);
-  return out;
+  return { stocks: {}, model: null, accessError: true };
 }
 
 async function research() {
@@ -216,10 +221,12 @@ async function research() {
     ? [{ model: process.env.SIGNAL_MODEL, tool: process.env.SIGNAL_SEARCH_TOOL || "web_search" }]
     : MODEL_CANDIDATES;
 
-  // Resolve a working model on the first ticker (cheap on access errors), then
-  // fetch every entry through a small concurrency pool pinned to that model.
-  const first = await researchOne(client, candidates, NAV_ORDER[0]);
-  if (first.accessError) {
+  // One combined call for ALL equities (resolves the working model on access
+  // errors), then a separate, lighter call for the MACRO regime. Two calls total
+  // instead of one-per-name — far less repeated prompt + per-call overhead.
+  console.log(`Researching ${STOCK_ORDER.length} equities in one call + MACRO separately`);
+  const stockRun = await researchGroup(client, candidates, STOCK_ORDER);
+  if (stockRun.accessError) {
     let available = "(could not list models)";
     try {
       const list = await client.models.list();
@@ -230,14 +237,10 @@ async function research() {
       `Grant this key's project access to one, or set SIGNAL_MODEL to a model from: ${available}`
     );
   }
-  const pinned = candidates.find((c) => c.model === first.model) || candidates[0];
-  console.log(`Researching ${NAV_ORDER.length} entries with ${pinned.model} (${pinned.tool}), concurrency 3`);
+  const pinned = candidates.find((c) => c.model === stockRun.model) || candidates[0];
+  const macroRun = await researchGroup(client, [pinned], ["MACRO"]);
 
-  const out = {};
-  if (first.stock) out[first.sym] = first.stock;
-  const rest = await mapPool(NAV_ORDER.slice(1), 3, (sym) => researchOne(client, [pinned], sym));
-  for (const r of rest) if (r && r.stock) out[r.sym] = r.stock;
-
+  const out = { ...stockRun.stocks, ...macroRun.stocks };
   if (!Object.keys(out).length) throw new Error("No valid data produced for any entry");
   return out;
 }

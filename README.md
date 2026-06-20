@@ -28,7 +28,7 @@ contested) and an importance weight, then rolled up into a per-name
 
 | Name | Thesis-critical signals |
 |------|--------------------------|
-| **ORCL** | RPO/backlog + conversion, OCI growth, AI run-rate, capex/rev, FCF margin, debt issuance, **2035 bond price/yield**, CDS spread, contracted DC power |
+| **ORCL** | RPO/backlog + conversion, OCI growth, AI run-rate, capex/rev, FCF margin, debt issuance, **2035 bond price/yield**, contracted DC power |
 | **MSFT** | Azure growth, AI run-rate, Copilot attach, capex/rev, FCF margin, cloud gross margin, DC power |
 | **NKE**  | gross margin, inventory, markdown intensity, Greater China sales, DTC trend |
 | **GEV**  | total backlog, gas-turbine slots, contracted GW, datacenter power orders, FCF margin, grid backlog |
