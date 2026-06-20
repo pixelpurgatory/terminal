@@ -263,59 +263,11 @@ const STOCKS = {
     ],
   },
 
-  MACRO: {
-    name: "Macro Regime",
-    sector: "Cross-Asset · Geopolitical",
-    benchmark: "—",
-    macro: true,
-    tag: "THE BACKDROP",
-    thesis:
-      "The cross-asset and geopolitical regime every single-name thesis trades inside. " +
-      "Rates, the dollar, oil, credit and volatility set risk appetite; live geopolitical " +
-      "flashpoints (Iran, Ukraine, Taiwan) drive the tail risks. Stance is read as " +
-      "risk-on (bull) vs risk-off (bear).",
-    signals: [
-      // --- Rates & Policy ---
-      { key: "us10y", label: "US 10Y Yield", group: "Rates & Policy", weight: 3,
-        value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
-        note: "Latest 10-year Treasury yield; a sharp rise tightens conditions (risk-off)." },
-      { key: "fed", label: "Fed Policy Stance", group: "Rates & Policy", weight: 2,
-        value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
-        note: "Current Fed stance from the latest FOMC / headlines: cutting (bull) vs hiking (bear)." },
-      // --- Equity & Vol ---
-      { key: "spx", label: "S&P 500", group: "Equity & Vol", weight: 3,
-        value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
-        note: "Latest S&P 500 level and trend; uptrend = risk-on." },
-      { key: "vix", label: "VIX (Volatility)", group: "Equity & Vol", weight: 2,
-        value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
-        note: "Latest VIX; below ~16 is calm (bull), above ~25 is stressed (bear)." },
-      // --- Commodities ---
-      { key: "wti", label: "WTI Crude Oil", group: "Commodities", weight: 3,
-        value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
-        note: "Latest WTI crude ($/bbl); a spike feeds inflation and geopolitical risk (bearish for risk assets)." },
-      // --- Credit & FX ---
-      { key: "dxy", label: "US Dollar (DXY)", group: "Credit & FX", weight: 2,
-        value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
-        note: "Latest dollar index; rapid USD strength tightens global conditions (risk-off)." },
-      { key: "hy", label: "US HY Credit Spread", group: "Credit & FX", weight: 2,
-        value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
-        note: "Latest US high-yield OAS in bps; widening = risk-off, tightening = risk-on." },
-      // --- Geopolitical Risk (latest BREAKING headline only) ---
-      { key: "iran", label: "Iran", group: "Geopolitical Risk", weight: 2,
-        value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
-        note: "Current US/Israel–Iran tension from the latest headlines; escalation = risk-off (bear)." },
-      { key: "ukraine", label: "Ukraine / Russia", group: "Geopolitical Risk", weight: 2,
-        value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
-        note: "Current Russia–Ukraine war status from the latest headlines; escalation = risk-off (bear)." },
-      { key: "taiwan", label: "Taiwan", group: "Geopolitical Risk", weight: 2,
-        value: "—", delta: "", trend: "flat", stance: "neutral", raw: 50,
-        note: "Current China–Taiwan tension level from the latest headlines; escalation = risk-off (bear)." },
-    ],
-  },
 };
 
 const STOCK_ORDER = ["ORCL", "MSFT", "NKE", "GEV"];
-const NAV_ORDER = [...STOCK_ORDER, "MACRO"];
+// NAV_ORDER kept as an alias of STOCK_ORDER (the MACRO regime entry was removed).
+const NAV_ORDER = [...STOCK_ORDER];
 
 // Social + professional sentiment — shown on each stock but weight 0, so they
 // are DISPLAY-ONLY and never move the thesis verdict.

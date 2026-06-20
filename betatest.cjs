@@ -44,8 +44,8 @@ const path = require('path');
   await page.waitForTimeout(200);
   checks.logLines = await page.$$eval('.cmd-line', els => els.length);
 
-  // sparkline canvases have non-zero size
-  checks.sparkSized = await page.$$eval('.card-spark', els => els.every(c => c.width > 0 && c.height > 0));
+  // full-update button is present in the header
+  checks.updateBtn = await page.$$eval('#full-update', els => els.length);
 
   await page.screenshot({ path: 'preview.png', fullPage: false });
   await browser.close();

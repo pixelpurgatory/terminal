@@ -92,6 +92,14 @@ body {
 .topnav { display: flex; gap: 14px; flex-wrap: wrap; }
 .hint { color: var(--ink-dim); font-size: 11px; border: 1px solid var(--green-dd); padding: 2px 6px; border-radius: 3px; }
 .status { display: flex; align-items: center; gap: 16px; }
+.update-btn {
+  font: inherit; font-size: 11px; letter-spacing: 1px; cursor: pointer;
+  color: var(--green); background: rgba(0,255,102,.06);
+  border: 1px solid var(--green-dd); border-radius: 3px; padding: 4px 9px;
+  text-shadow: var(--glow); transition: background .15s, box-shadow .15s;
+}
+.update-btn:hover:not(:disabled) { background: rgba(0,255,102,.16); box-shadow: 0 0 8px var(--green-dd); }
+.update-btn:disabled { color: var(--ink-dim); text-shadow: none; cursor: not-allowed; opacity: .65; }
 .mkt { font-size: 11px; letter-spacing: 1px; }
 .mkt.open { color: var(--green); text-shadow: var(--glow); animation: pulse 1.6s infinite; }
 .mkt.closed { color: var(--ink-dim); }

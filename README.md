@@ -46,7 +46,8 @@ one-time toggle (the repo's CI token can't enable Pages on its own):
 > branch **`claude/matrix-stocks-terminal-v8u4pp`**, folder **`/ (root)`** → Save.
 
 In branch mode GitHub serves the site directly and **rebuilds on every commit** —
-so the daily AI data refresh shows up automatically, no extra workflow.
+so a **full update** (which commits `js/live-data.js`) shows up automatically, no
+extra workflow. (The daily news run is Telegram-only and does not commit.)
 
 ## Run it locally
 
@@ -62,22 +63,37 @@ python3 -m http.server 8080   # then visit http://localhost:8080
 
 ## Self-updating AI feed
 
-The terminal can refresh its own signals. A research agent lives in the repo and
-runs **once a day, ~1 hour before the US market open** (GitHub Actions cron): it calls **OpenAI (Responses API)
-with web search** — trying `gpt-5.4-mini` → `gpt-4.1` → `gpt-4.1-mini` and using the
-first your project can access (or pin one with the `SIGNAL_MODEL` env var). It looks up the latest real-world value for every
-signal defined in `js/data.js`, and commits the result to `js/live-data.js`. The terminal loads
-that file and renders **only that real data** — the feed chip shows **`◉ LIVE`**
-with a timestamp, and each name gets an **AI READ** summary line with source
-links. There is no simulated price tape and no synthetic charts; if the feed is
-missing, the terminal shows a **`◉ NO LIVE DATA`** notice rather than fake values.
+The research agent (in `scripts/update-signals.mjs`) calls **OpenAI (Responses API)
+with web search** — trying `gpt-5.5` → `gpt-5.4-mini` → `gpt-4.1` → `gpt-4.1-mini`
+and using the first your project can access (or pin one with `SIGNAL_MODEL`). It
+runs in one of two **modes**:
+
+- **`full`** — researches every signal in `js/data.js` plus price + news, writes
+  `js/live-data.js` + `data/live.json`, and **commits them** (updates the site).
+  Triggered by the in-terminal **⟳ FULL UPDATE** button (max once / 24h) or
+  manually via *Actions → Run workflow*.
+- **`news`** (the daily schedule) — researches only the latest **price + headlines**
+  and sends the **Telegram brief**. It does **not** touch the website.
+
+The terminal renders **only real data** — the feed chip shows **`◉ LIVE`** with a
+timestamp, each name gets an **AI READ** summary with source links, and missing
+data shows a **`◉ NO LIVE DATA`** notice rather than fake values.
 
 ```
-GitHub Actions (cron, 1×/day, ~1h pre-open)
-   └─ node scripts/update-signals.mjs        # OpenAI + web_search
-        └─ writes js/live-data.js + data/live.json, commits them
-             └─ the terminal loads js/live-data.js and overlays the values
+Daily cron (1×/day, ~1h pre-open)  → SIGNAL_MODE=news → Telegram brief only
+⟳ FULL UPDATE button / manual run  → SIGNAL_MODE=full → commit js/live-data.js + data/live.json
+                                                          └─ terminal overlays the values
 ```
+
+### The ⟳ FULL UPDATE button
+
+The site is static, so the button triggers research by calling GitHub's
+`workflow_dispatch` API from the browser. On first use it asks for a **GitHub
+fine-grained token** (scope: *Actions Read+Write* on this repo), stored **only in
+your browser's localStorage** — never in the page or repo. A client-side **24h
+cooldown** limits it to one full update per day. Point it at the right repo/branch
+by setting `matrix_gh_owner` / `matrix_gh_repo` / `matrix_gh_ref` in localStorage
+if the defaults don't match your deployment.
 
 `js/data.js` stays the single source of truth for *which* signals exist; the
 agent only refreshes their *values*, and anything it can't confidently find is
@@ -93,9 +109,9 @@ left out (the UI keeps the curated fallback).
 
 ### Telegram brief (optional)
 
-The scheduled job can DM you a **detailed brief** once a day (~1h before the open):
-macro regime, per-stock verdict/price/top signals, flips since last run, and a
-headline each. To enable, add two repo secrets:
+The daily job DMs you a **news brief** once a day (~1h before the open):
+per-stock price, daily change, and the latest rated headlines (a verdict line too
+when a full update has populated signals). To enable, add two repo secrets:
 
 - `TELEGRAM_BOT_TOKEN` — from **@BotFather** (`/newbot`)
 - `TELEGRAM_CHAT_ID` — your numeric id (message **@userinfobot**); **message your

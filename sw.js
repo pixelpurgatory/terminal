@@ -1,9 +1,9 @@
 /* Matrix Terminal service worker — offline support + fresh live data.
    Static assets: stale-while-revalidate. live-data.js & navigations: network-first. */
-const CACHE = "matrix-terminal-v1";
+const CACHE = "matrix-terminal-v2";
 const CORE = [
   "./", "index.html", "css/styles.css",
-  "js/data.js", "js/matrix.js", "js/app.js",
+  "js/data.js", "js/matrix.js", "js/update-button.js", "js/app.js",
   "manifest.webmanifest", "icons/icon.svg",
 ];
 

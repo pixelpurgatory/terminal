@@ -1,26 +1,32 @@
 name: Update signals (AI research)
 
-# Runs the in-repo research agent ONCE a day, ~1 hour before the US market open
-# (08:30 America/New_York → the 09:30 ET open). It calls OpenAI with web search,
-# refreshes js/live-data.js + data/live.json, commits the result, and sends the
-# Telegram brief.
+# TWO purposes, selected by `mode`:
+#   • news (the daily schedule) — research only latest price + headlines and send
+#     the Telegram brief. Does NOT touch the website (no commit).
+#   • full (manual / the in-terminal button) — research ALL signals + price + news,
+#     commit js/live-data.js + data/live.json (updates the site), then Telegram.
 #
-# GitHub cron is UTC-only and does not follow US daylight-saving, so we list both
-# candidate UTC times (12:30 EDT / 13:30 EST) and a `gate` job lets exactly one of
-# them through — the one that is actually 08:30 in New York that day.
+# The scheduled cron runs ONCE a day, ~1h before the US open (08:30 America/New_York).
+# GitHub cron is UTC-only and ignores US DST, so both candidate UTC times are listed
+# and a `gate` job lets exactly one through — the one that is 08:30 in New York.
 #
 # Requirements:
-#   - Repo secret `matrix` holding an OpenAI API key (Settings → Secrets and
-#     variables → Actions). It is exposed to the script as OPENAI_API_KEY below.
-#   - For the *scheduled* runs to fire, this workflow must exist on the repo's
-#     DEFAULT branch (GitHub only schedules workflows from the default branch).
-#     You can always trigger it manually on any branch via "Run workflow".
+#   - Repo secret `matrix` holding an OpenAI API key (exposed as OPENAI_API_KEY).
+#   - Scheduled runs only fire from the repo's DEFAULT branch. The in-terminal
+#     button dispatches this workflow on whatever branch it targets; that branch
+#     must carry this workflow file (with the `mode` input below).
 
 on:
   schedule:
     - cron: "30 12 * * 1-5"   # 08:30 ET while on EDT (1h before the 09:30 open)
     - cron: "30 13 * * 1-5"   # 08:30 ET while on EST (1h before the 09:30 open)
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "full = all signals + price + news (updates the site); news = price + news only (Telegram only)"
+        type: choice
+        options: [full, news]
+        default: full
 
 permissions:
   contents: write
@@ -30,19 +36,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Let only the schedule that lands on 08:30 New York time proceed (manual runs
-  # always proceed). This keeps it to a single daily run across DST changes.
+  # Decide whether to run and in which mode. Scheduled runs are always `news`
+  # (and only the one landing on 08:30 New York proceeds). Manual runs use the
+  # chosen input (default full).
   gate:
     runs-on: ubuntu-latest
     outputs:
       go: ${{ steps.check.outputs.go }}
+      mode: ${{ steps.check.outputs.mode }}
     steps:
       - id: check
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "go=true" >> "$GITHUB_OUTPUT"
+            echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
           elif [ "$(TZ=America/New_York date +%H)" = "08" ]; then
             echo "go=true" >> "$GITHUB_OUTPUT"
+            echo "mode=news" >> "$GITHUB_OUTPUT"
           else
             echo "go=false (skipping: not 08:30 New York time)"
             echo "go=false" >> "$GITHUB_OUTPUT"
@@ -65,9 +75,12 @@ jobs:
       - name: Research latest signals
         env:
           OPENAI_API_KEY: ${{ secrets.matrix }}
+          SIGNAL_MODE: ${{ needs.gate.outputs.mode }}
         run: node scripts/update-signals.mjs
 
+      # Only a FULL update changes the site; the daily news run is Telegram-only.
       - name: Commit refreshed data
+        if: needs.gate.outputs.mode == 'full'
         run: |
           git config user.name "matrix-signal-bot"
           git config user.email "github-actions[bot]@users.noreply.github.com"

@@ -30,12 +30,12 @@
         <span class="brand-name">MATRIX<span class="dim">::</span>TERMINAL</span>
       </div>
       <nav class="topnav" aria-label="ticker quick keys">
-        <span class="hint">[1-5] switch</span>
-        <span class="hint">[m] macro</span>
+        <span class="hint">[1-4] switch</span>
         <span class="hint">[↑↓] cycle</span>
         <span class="hint">[/] command</span>
       </nav>
       <div class="status">
+        <button id="full-update" class="update-btn" type="button" title="Run AI research now. Max once per 24h.">⟳ FULL UPDATE</button>
         <span id="mkt-status" class="mkt closed">● MARKET CLOSED</span>
         <span id="clock" class="clock">--:--:-- UTC</span>
       </div>
@@ -71,6 +71,7 @@
   <script src="js/data.js"></script>
   <script src="js/live-data.js"></script>
   <script src="js/matrix.js"></script>
+  <script src="js/update-button.js"></script>
   <script src="js/app.js"></script>
   <script>
     if ("serviceWorker" in navigator) {

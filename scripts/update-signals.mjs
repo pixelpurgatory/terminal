@@ -7,12 +7,17 @@
  *  and data/live.json (a human-readable record).
  *
  *  The curated model in js/data.js is the single source of truth for WHICH
- *  signals exist; this script researches their VALUES one entry per call (each
- *  ticker, then the MACRO regime). Anything the model can't verify is omitted (never faked); the UI shows only
+ *  signals exist; this script researches their VALUES one ticker per call.
+ *  Anything the model can't verify is omitted (never faked); the UI shows only
  *  the signals that came back with a real value.
  *
+ *  Two modes (SIGNAL_MODE env):
+ *    full  (default) — research all signals + price + news; updates the site.
+ *    news            — research only latest price + headlines (cheap daily brief).
+ *
  *  Usage:
- *    node scripts/update-signals.mjs            # live: needs OPENAI_API_KEY
+ *    node scripts/update-signals.mjs            # live full: needs OPENAI_API_KEY
+ *    SIGNAL_MODE=news node scripts/update-signals.mjs
  *    node scripts/update-signals.mjs --dry-run  # offline: synthesizes mock data
  * ===========================================================================*/
 
@@ -35,11 +40,11 @@ function loadCuratedModel() {
 }
 const curated = loadCuratedModel();
 const { STOCKS } = curated;
-// STOCK_ORDER = equities only; NAV_ORDER also includes the MACRO regime entry.
 const STOCK_ORDER = curated.STOCK_ORDER || [];
-const NAV_ORDER = curated.NAV_ORDER || curated.STOCK_ORDER;
 
 const DRY_RUN = process.argv.includes("--dry-run");
+// full = all signals + price + news (updates the site); news = price + news only.
+const MODE = (process.env.SIGNAL_MODE || "full").toLowerCase() === "news" ? "news" : "full";
 // Web-search-capable models, tried in order, each with its correct tool type
 // (newer models use "web_search"; gpt-4o uses the legacy "web_search_preview").
 // Pin one with SIGNAL_MODEL (tool defaults to web_search; override SIGNAL_SEARCH_TOOL).
@@ -72,29 +77,31 @@ function buildSpec(sym) {
 }
 
 /* ---------- Prompt ---------- */
-// One entry per call (kept small to stay under the per-minute token limit).
-// Stocks and MACRO get different guidance. JSON is sent compact to save tokens.
-function buildPrompt(syms) {
-  const macro = syms.length === 1 && !!(STOCKS[syms[0]] && STOCKS[syms[0]].macro);
-  const specs = {};
-  for (const sym of syms) specs[sym] = buildSpec(sym);
+// One ticker per call (kept small to stay under the per-minute token limit).
+// mode "full" researches every signal + price + news; mode "news" researches
+// only the latest price + headlines (the cheap daily brief). JSON kept compact.
+function buildPrompt(sym, mode) {
+  const s = STOCKS[sym];
   const L = [];
-  L.push(`You are a meticulous equity-research analyst updating a live signal terminal. Use the web_search tool to find the most recent real value for EACH signal below. Verify every figure from a recent, credible source (earnings release, 10-Q/10-K/8-K, IR deck, reputable finance/credit news) — never approximate from memory, never reuse a stale number. Assign each signal's stance from its own verified reading, not the overall vibe. OMIT any signal you can't credibly source (never guess).`);
-  L.push(`\n${macro ? "Entry" : (syms.length > 1 ? syms.length + " tickers" : "Ticker")} and signals to refresh: ${JSON.stringify(specs)}`);
-  L.push(`\nPer signal return: value (short string WITH units, <=16 chars, e.g. "$462B","+34% YoY","118 bps"), delta (period-over-period change, "" if unknown), trend ("up"|"down"|"flat" = how the metric moved), stance ("bull"|"bear"|"neutral" = what the reading implies for the ${macro ? "RISK-ASSET regime ('bull'=risk-on/supportive, 'bear'=risk-off)" : "BULL thesis on that name"}), raw (0-100 strength for a gauge), note (one sentence <=130 chars).`);
 
-  if (macro) {
-    L.push(`\nMACRO is a cross-asset & geopolitical regime, not a company — omit price/changePct/earnings. For rates/vol/commodities/credit/FX signals give the latest level. Keep geopolitical signals (iran, ukraine, taiwan) CHEAP: do ONE quick search each for only the single latest BREAKING headline, report a short status as value (e.g. "Escalating","Tense","Ceasefire talks") with that headline's source URL — no deep multi-source research.`);
-  } else {
-    L.push(`\nAlso return PER TICKER: price (number, no symbol), changePct (signed daily % e.g. -1.8; omit if unknown), earnings (NEXT report date ISO "YYYY-MM-DD"; omit if unknown), asOf (date your figures reflect, ISO), summary (one sentence read on the name), sources (1-4 URLs), news (up to 3 LATEST headlines, most recent first, each {title,url,source,stance}). For each headline, stance = how bullish/bearish that news is for the name — one of "strong_bull"|"bull"|"neutral"|"bear"|"strong_bear".`);
-    L.push(`\nCoverage: try to source EVERY listed signal. Fundamentals (growth, margins, backlog/RPO, FCF, capex, gross margin, segment/China sales, subs, deposits, volumes, EPS-revision trend, relative strength vs the benchmark ETF) come from filings/IR/finance sites. Market signals not in filings (options IV-rank/skew, insider selling, relative strength) come from recent finance news/commentary — report the latest cited figure with its source.`);
-    L.push(`\nSentiment signals (x_sent, reddit_sent, pro_sent) are display-only reads, not fundamentals: value = short read (e.g. "Bullish 70%","Mixed"), stance matching it, note citing what you saw (recent X/Twitter, Reddit, or sell-side ratings/PT changes).`);
+  if (mode === "news") {
+    L.push(`You are a markets news analyst updating a live terminal. Use the web_search tool to find, for ${s.name} (${sym}), the latest share price, today's % change, and the most recent top headlines. Verify from recent, credible finance sources — never guess, never reuse a stale number.`);
+    L.push(`\nReturn: price (number, no symbol), changePct (signed daily % e.g. -1.8; omit if unknown), asOf (date your figures reflect, ISO), summary (one sentence read on the name today), sources (1-4 URLs), news (up to 3 LATEST headlines, most recent first, each {title,url,source,stance}). For each headline, stance = how bullish/bearish that news is for the name — one of "strong_bull"|"bull"|"neutral"|"bear"|"strong_bear".`);
+    const shape = `{"stocks":{"${sym}":{"price":0,"changePct":0,"asOf":"YYYY-MM-DD","summary":"...","sources":["https://..."],"news":[{"title":"...","url":"https://...","source":"outlet","stance":"bull"}]}}}`;
+    L.push(`\nRespond with ONLY one JSON object, no prose, shape:\n${shape}`);
+    return L.join("\n");
   }
 
-  const shape = macro
-    ? `{"stocks":{"${syms[0]}":{"asOf":"YYYY-MM-DD","signals":{"signalKey":{"value":"...","delta":"...","trend":"up","stance":"bull","raw":0,"note":"..."}}}}}`
-    : `{"stocks":{"TICKER":{"price":0,"changePct":0,"earnings":"YYYY-MM-DD","asOf":"YYYY-MM-DD","summary":"...","sources":["https://..."],"news":[{"title":"...","url":"https://...","source":"outlet","stance":"bull"}],"signals":{"signalKey":{"value":"...","delta":"...","trend":"up","stance":"bull","raw":0,"note":"..."}}}}}`;
-  L.push(`\nRespond with ONLY one JSON object, no prose, with a "stocks" map keyed by ticker symbol${macro ? "" : " (one entry per ticker above)"}, shape:\n${shape}`);
+  // full mode
+  const spec = { [sym]: buildSpec(sym) };
+  L.push(`You are a meticulous equity-research analyst updating a live signal terminal. Use the web_search tool to find the most recent real value for EACH signal below. Verify every figure from a recent, credible source (earnings release, 10-Q/10-K/8-K, IR deck, reputable finance/credit news) — never approximate from memory, never reuse a stale number. Assign each signal's stance from its own verified reading, not the overall vibe. OMIT any signal you can't credibly source (never guess).`);
+  L.push(`\nTicker and signals to refresh: ${JSON.stringify(spec)}`);
+  L.push(`\nPer signal return: value (short string WITH units, <=16 chars, e.g. "$462B","118 bps"), trend ("up"|"down"|"flat" = how the metric moved), stance ("bull"|"bear"|"neutral" = what the reading implies for the BULL thesis on that name), raw (0-100 strength for a gauge), note (one sentence <=130 chars).`);
+  L.push(`\nAlso return PER TICKER: price (number, no symbol), changePct (signed daily % e.g. -1.8; omit if unknown), earnings (NEXT report date ISO "YYYY-MM-DD"; omit if unknown), asOf (date your figures reflect, ISO), summary (one sentence read on the name), sources (1-4 URLs), news (up to 3 LATEST headlines, most recent first, each {title,url,source,stance}). For each headline, stance = how bullish/bearish that news is for the name — one of "strong_bull"|"bull"|"neutral"|"bear"|"strong_bear".`);
+  L.push(`\nCoverage: try to source EVERY listed signal. Fundamentals (growth, margins, backlog/RPO, FCF, capex, gross margin, segment/China sales, subs, deposits, volumes, EPS-revision trend, relative strength vs the benchmark ETF) come from filings/IR/finance sites. Market signals not in filings (options IV-rank/skew, insider selling, relative strength) come from recent finance news/commentary — report the latest cited figure with its source.`);
+  L.push(`\nSentiment signals (x_sent, reddit_sent, pro_sent) are display-only reads, not fundamentals: value = short read (e.g. "Bullish 70%","Mixed"), stance matching it, note citing what you saw (recent X/Twitter, Reddit, or sell-side ratings/PT changes).`);
+  const shape = `{"stocks":{"${sym}":{"price":0,"changePct":0,"earnings":"YYYY-MM-DD","asOf":"YYYY-MM-DD","summary":"...","sources":["https://..."],"news":[{"title":"...","url":"https://...","source":"outlet","stance":"bull"}],"signals":{"signalKey":{"value":"...","trend":"up","stance":"bull","raw":0,"note":"..."}}}}}`;
+  L.push(`\nRespond with ONLY one JSON object, no prose, shape:\n${shape}`);
   return L.join("\n");
 }
 
@@ -117,30 +124,30 @@ function extractJson(text) {
 const NA_VALUES = new Set(["n/a", "na", "n.a.", "-", "–", "—", "tbd", "unknown", "none", "null", "?"]);
 const isNA = (s) => NA_VALUES.has(String(s).trim().toLowerCase());
 
-// Validate one ticker's payload against its known signal keys. Returns the
-// cleaned stock object, or null if it has no usable signals.
-function validateStock(sym, incoming) {
+// Validate one ticker's payload. In full mode it requires at least one usable
+// signal; in news mode it keeps price/news (no signals). Returns null if empty.
+function validateStock(sym, incoming, mode = "full") {
   if (!incoming || typeof incoming !== "object") return null;
-  const known = new Set(STOCKS[sym].signals.map((g) => g.key));
-  const signals = {};
-  for (const [key, v] of Object.entries(incoming.signals || {})) {
-    if (!known.has(key) || !v || typeof v !== "object") continue;
-    const entry = {};
-    if (typeof v.value === "string" && v.value.trim() && !isNA(v.value)) entry.value = v.value.trim().slice(0, 24);
-    if (typeof v.delta === "string" && !isNA(v.delta)) entry.delta = v.delta.trim().slice(0, 24);
-    if (TRENDS.has(v.trend)) entry.trend = v.trend;
-    if (STANCES.has(v.stance)) entry.stance = v.stance;
-    if (Number.isFinite(v.raw)) entry.raw = Math.max(0, Math.min(100, Math.round(v.raw)));
-    if (typeof v.note === "string" && v.note.trim()) entry.note = v.note.trim().slice(0, 160);
-    if (entry.value) signals[key] = entry; // a signal is only useful with a real value
+  const stock = { signals: {} };
+  if (mode === "full") {
+    const known = new Set(STOCKS[sym].signals.map((g) => g.key));
+    for (const [key, v] of Object.entries(incoming.signals || {})) {
+      if (!known.has(key) || !v || typeof v !== "object") continue;
+      const entry = {};
+      if (typeof v.value === "string" && v.value.trim() && !isNA(v.value)) entry.value = v.value.trim().slice(0, 24);
+      if (TRENDS.has(v.trend)) entry.trend = v.trend;
+      if (STANCES.has(v.stance)) entry.stance = v.stance;
+      if (Number.isFinite(v.raw)) entry.raw = Math.max(0, Math.min(100, Math.round(v.raw)));
+      if (typeof v.note === "string" && v.note.trim()) entry.note = v.note.trim().slice(0, 160);
+      if (entry.value) stock.signals[key] = entry; // a signal is only useful with a real value
+    }
+    if (typeof incoming.earnings === "string" && /^\d{4}-\d{2}-\d{2}$/.test(incoming.earnings.trim())) {
+      stock.earnings = incoming.earnings.trim();
+    }
   }
-  const stock = { signals };
   if (Number.isFinite(incoming.price)) stock.price = incoming.price;
   if (Number.isFinite(incoming.changePct)) stock.changePct = incoming.changePct;
   if (typeof incoming.asOf === "string") stock.asOf = incoming.asOf.slice(0, 10);
-  if (typeof incoming.earnings === "string" && /^\d{4}-\d{2}-\d{2}$/.test(incoming.earnings.trim())) {
-    stock.earnings = incoming.earnings.trim();
-  }
   if (typeof incoming.summary === "string") stock.summary = incoming.summary.trim().slice(0, 240);
   if (Array.isArray(incoming.sources)) {
     stock.sources = incoming.sources
@@ -162,7 +169,8 @@ function validateStock(sym, incoming) {
         return item;
       });
   }
-  return Object.keys(signals).length ? stock : null;
+  if (mode === "full") return Object.keys(stock.signals).length ? stock : null;
+  return (Number.isFinite(stock.price) || (stock.news && stock.news.length)) ? stock : null;
 }
 
 // Pull this ticker's object out of whatever shape the model returned.
@@ -179,14 +187,14 @@ function pickStock(parsed, sym) {
 const isAccessError = (msg) =>
   /does not have access|model.*not found|unknown model|no such model|\b40[34]\b/i.test(msg);
 
-// Research a GROUP of entries in a SINGLE call (all equities together, or MACRO
-// alone). Tries the model candidates (cheap on access errors). Returns the
-// validated stock objects keyed by symbol. Search depth is kept low to save cost.
-async function researchGroup(client, candidates, syms) {
-  const input = buildPrompt(syms);
+// Research ONE ticker in a single call. Tries the model candidates (cheap on
+// access errors). Returns the validated stock object (or null). Search depth is
+// kept low to save cost; news mode uses a smaller output cap.
+async function researchOne(client, candidates, sym, mode) {
+  const input = buildPrompt(sym, mode);
   // max_output_tokens is a CAP, not a charge — billing is per token actually
-  // produced — so scale generous headroom by group size to avoid truncated JSON.
-  const maxTokens = Math.min(30000, 8000 + syms.length * 4000);
+  // produced — so leave generous headroom to avoid truncated JSON.
+  const maxTokens = mode === "news" ? 4000 : 12000;
   for (const { model, tool } of candidates) {
     try {
       // Reasoning models (gpt-5.x) spend part of the output budget on hidden
@@ -204,22 +212,17 @@ async function researchGroup(client, candidates, syms) {
       const text = (response.output_text || "").trim();
       if (!text) throw new Error("empty output");
       usedModel = model;
-      const parsed = extractJson(text);
-      const stocks = {};
-      for (const sym of syms) {
-        const stock = validateStock(sym, pickStock(parsed, sym));
-        if (stock) stocks[sym] = stock;
-        console.log(`  ${sym}: ${stock ? Object.keys(stock.signals).length + " signals" : "no data"} (${model})`);
-      }
-      return { stocks, model, accessError: false };
+      const stock = validateStock(sym, pickStock(extractJson(text), sym), mode);
+      console.log(`  ${sym}: ${stock ? (Object.keys(stock.signals).length + " signals") : "no data"} (${model})`);
+      return { stock, model, accessError: false };
     } catch (err) {
       const msg = err?.message || String(err);
       if (isAccessError(msg)) { continue; } // try next candidate
-      console.warn(`  group [${syms.join(",")}] failed on ${model} — ${msg}`);
-      return { stocks: {}, model, accessError: false };
+      console.warn(`  ${sym} failed on ${model} — ${msg}`);
+      return { stock: null, model, accessError: false };
     }
   }
-  return { stocks: {}, model: null, accessError: true };
+  return { stock: null, model: null, accessError: true };
 }
 
 // Run fn over items with bounded concurrency (fast, but gentle on rate limits).
@@ -233,18 +236,18 @@ async function mapPool(items, concurrency, fn) {
   return out;
 }
 
-async function research() {
+async function research(mode) {
   const { default: OpenAI } = await import("openai");
   const client = new OpenAI({ timeout: 540000, maxRetries: 1 }); // 9 min/call, 1 retry
   const candidates = process.env.SIGNAL_MODEL
     ? [{ model: process.env.SIGNAL_MODEL, tool: process.env.SIGNAL_SEARCH_TOOL || "web_search" }]
     : MODEL_CANDIDATES;
 
-  // ONE web-search call per entry (4 equities + MACRO = 5 calls). Each call is
-  // small, so it stays well under the per-minute token limit — combining names
-  // into one call blew past TPM. The first entry resolves the working model;
-  // the rest run through a small concurrency pool pinned to it.
-  const first = await researchGroup(client, candidates, [NAV_ORDER[0]]);
+  // ONE web-search call per ticker. Each call is small, so it stays well under
+  // the per-minute token limit — combining names into one call blew past TPM.
+  // The first ticker resolves the working model; the rest run through a small
+  // concurrency pool pinned to it.
+  const first = await researchOne(client, candidates, STOCK_ORDER[0], mode);
   if (first.accessError) {
     let available = "(could not list models)";
     try {
@@ -257,11 +260,13 @@ async function research() {
     );
   }
   const pinned = candidates.find((c) => c.model === first.model) || candidates[0];
-  console.log(`Researching ${NAV_ORDER.length} entries (one call each) with ${pinned.model}, concurrency 3`);
+  console.log(`Researching ${STOCK_ORDER.length} tickers (${mode} mode) with ${pinned.model}, concurrency 3`);
 
-  const out = { ...first.stocks };
-  const rest = await mapPool(NAV_ORDER.slice(1), 3, (sym) => researchGroup(client, [pinned], [sym]));
-  for (const r of rest) Object.assign(out, r.stocks);
+  const out = {};
+  if (first.stock) out[STOCK_ORDER[0]] = first.stock;
+  const restSyms = STOCK_ORDER.slice(1);
+  const rest = await mapPool(restSyms, 3, (sym) => researchOne(client, [pinned], sym, mode));
+  rest.forEach((r, i) => { if (r.stock) out[restSyms[i]] = r.stock; });
 
   if (!Object.keys(out).length) throw new Error("No valid data produced for any entry");
   return out;
@@ -270,32 +275,22 @@ async function research() {
 /* ---------- Offline mock (exercises the whole pipeline) ---------- */
 function mock() {
   const out = {};
-  for (const sym of NAV_ORDER) {
+  for (const sym of STOCK_ORDER) {
     const s = STOCKS[sym];
     const signals = {};
-    s.signals.forEach((g, gi) => {
-      const base = parseNum(g.value) ?? 50;
-      const hist = Array.from({ length: 12 }, (_, k) =>
-        Math.round((base * (1 + Math.sin((k + gi) * 0.6) * 0.06)) * 100) / 100);
+    s.signals.forEach((g) => {
       signals[g.key] = {
         value: g.value,
-        delta: g.delta,
         trend: g.trend,
         stance: g.stance,
         raw: Math.max(0, Math.min(100, g.raw + (Math.random() < 0.5 ? -3 : 3))),
         note: g.note,
-        hist,
-        // Flag the first signal of each name as "changed" to exercise the alerts UI.
-        ...(gi === 0 ? { stanceFrom: g.stance === "bull" ? "bear" : "bull", valueFrom: "prev" } : {}),
       };
     });
-    const base = s.price || 100;
     out[sym] = {
       price: s.price,
       changePct: Math.round((Math.random() - 0.5) * 60) / 10,
       earnings: new Date(Date.now() + (3 + Math.floor(Math.random() * 40)) * 864e5).toISOString().slice(0, 10),
-      priceHist: s.price ? Array.from({ length: 20 }, (_, k) =>
-        Math.round(base * (1 + Math.sin(k * 0.5) * 0.04) * 100) / 100) : undefined,
       asOf: new Date().toISOString().slice(0, 10),
       summary: `[MOCK] ${s.tag} — dry-run synthesized snapshot.`,
       sources: ["https://example.com/mock-source"],
@@ -311,65 +306,8 @@ function mock() {
   return out;
 }
 
-/* ---------- History + change detection (run-over-run) ---------- */
-const HIST_LEN = 30;
-
-// Pull the first numeric token out of a value string for sparkline history
-// ("$638B" -> 638, "+93% YoY" -> 93, "175 bps" -> 175, "SPY $747.31" -> 747.31).
-function parseNum(v) {
-  if (typeof v !== "string") return null;
-  const m = v.replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
-  return m ? Number(m[0]) : null;
-}
-
-function loadPrevious() {
-  try {
-    const code = readFileSync(resolve(ROOT, "js/live-data.js"), "utf8");
-    const scope = {};
-    new Function("window", code)(scope);
-    return (scope.LIVE_SIGNALS && scope.LIVE_SIGNALS.stocks) ? scope.LIVE_SIGNALS : null;
-  } catch { return null; }
-}
-
-// Append this run's values to per-signal history and flag what changed vs the
-// previous run (stance flips + value changes), so the UI can chart trends and
-// surface a "what changed" strip.
-function mergeHistory(stocks) {
-  const prev = loadPrevious();
-  for (const sym of Object.keys(stocks)) {
-    const s = stocks[sym];
-    const ps = prev && prev.stocks && prev.stocks[sym];
-    if (Number.isFinite(s.price)) {
-      const ph = (ps && Array.isArray(ps.priceHist)) ? ps.priceHist.slice() : [];
-      ph.push(s.price);
-      s.priceHist = ph.slice(-HIST_LEN);
-    } else if (ps && Array.isArray(ps.priceHist)) {
-      s.priceHist = ps.priceHist.slice(-HIST_LEN);
-    }
-    for (const key of Object.keys(s.signals)) {
-      const sig = s.signals[key];
-      const psig = ps && ps.signals && ps.signals[key];
-      const num = parseNum(sig.value);
-      const hist = (psig && Array.isArray(psig.hist)) ? psig.hist.slice() : [];
-      if (num != null) hist.push(num);
-      sig.hist = hist.slice(-HIST_LEN);
-      if (psig) {
-        if (psig.value !== undefined && psig.value !== sig.value) sig.valueFrom = psig.value;
-        if (psig.stance && psig.stance !== sig.stance) sig.stanceFrom = psig.stance;
-      }
-    }
-    // Flag headlines not seen in the previous run (for change-only briefs).
-    if (Array.isArray(s.news)) {
-      const prevUrls = new Set((ps && Array.isArray(ps.news) ? ps.news : []).map((n) => n.url));
-      const hadPrev = prevUrls.size > 0;
-      for (const n of s.news) n.isNew = hadPrev ? !prevUrls.has(n.url) : true;
-    }
-  }
-}
-
 /* ---------- Write outputs ---------- */
 function writeOutputs(stocks) {
-  if (!DRY_RUN) mergeHistory(stocks); // accumulate trends + change flags on live runs
   const payload = {
     generatedAt: new Date().toISOString(),
     model: DRY_RUN ? "dry-run-mock" : usedModel,
@@ -387,8 +325,8 @@ function writeOutputs(stocks) {
   writeFileSync(resolve(ROOT, "js/live-data.js"), js);
 
   const n = Object.keys(stocks).length;
-  const sig = Object.values(stocks).reduce((a, s) => a + Object.keys(s.signals).length, 0);
-  console.log(`Wrote live data: ${n}/${NAV_ORDER.length} tickers, ${sig} signals (${payload.mode}).`);
+  const sig = Object.values(stocks).reduce((a, s) => a + Object.keys(s.signals || {}).length, 0);
+  console.log(`Wrote live data: ${n}/${STOCK_ORDER.length} tickers, ${sig} signals (${payload.mode}).`);
 }
 
 /* ---------- Main ---------- */
@@ -402,7 +340,8 @@ function writeOutputs(stocks) {
       console.error("OPENAI_API_KEY is not set. Use --dry-run to test offline.");
       process.exit(1);
     }
-    const stocks = await research();
+    console.log(`SIGNAL_MODE=${MODE}`);
+    const stocks = await research(MODE);
     if (!Object.keys(stocks).length) throw new Error("No valid stock data produced");
     writeOutputs(stocks);
   } catch (err) {
