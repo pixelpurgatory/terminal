@@ -35,7 +35,8 @@ function loadCuratedModel() {
 }
 const curated = loadCuratedModel();
 const { STOCKS } = curated;
-// NAV_ORDER includes the MACRO regime entry; fall back for older data.js.
+// STOCK_ORDER = equities only; NAV_ORDER also includes the MACRO regime entry.
+const STOCK_ORDER = curated.STOCK_ORDER || [];
 const NAV_ORDER = curated.NAV_ORDER || curated.STOCK_ORDER;
 
 const DRY_RUN = process.argv.includes("--dry-run");
