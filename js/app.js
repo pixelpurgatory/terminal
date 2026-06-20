@@ -445,7 +445,7 @@
       case "help":
       case "?":
         log("commands: <TICKER> | macro | list | thesis | feed | next | prev | top | help | clear");
-        log("nav: keys [1-6] / [m] for macro · " + NAV_ORDER.join(" · "));
+        log("nav: keys [1-5] / [m] for macro · " + NAV_ORDER.join(" · "));
         break;
       case "macro":
         selectStock("MACRO");
@@ -517,7 +517,7 @@
       "establishing secure uplink ............ [ OK ]",
       "loading signal kernels ................ [ OK ]",
       "calibrating thesis engine ............. [ OK ]",
-      "syncing watchlist: ORCL MSFT HOOD NKE GEV",
+      "syncing watchlist: ORCL MSFT NKE GEV",
       "pulling live AI research feed ......... [ OK ]",
       "WAKE UP. THE MARKET HAS YOU.",
     ];

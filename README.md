@@ -1,7 +1,7 @@
 # MATRIX // STOCKS TERMINAL
 
-A Matrix-styled equity **signal** terminal for a focused 5-name watchlist:
-**ORCL · MSFT · HOOD · NKE · GEV**.
+A Matrix-styled equity **signal** terminal for a focused 4-name watchlist:
+**ORCL · MSFT · NKE · GEV**.
 
 Built around what can actually *change the thesis* on each name — not generic
 RSI/MACD noise. Every signal is tagged with its **thesis stance** (bull / bear /
@@ -20,7 +20,7 @@ contested) and an importance weight, then rolled up into a per-name
   one-line "why this moves the thesis."
 - **Command console** — type a ticker, or `help`, `list`, `thesis`, `top`,
   `next`, `prev`, `clear`.
-- **Keyboard** — `1`–`5` jump to a name, `↑/↓` (or `j/k`) cycle, `/` focuses the
+- **Keyboard** — `1`–`4` jump to a name, `↑/↓` (or `j/k`) cycle, `/` focuses the
   command line.
 - Responsive (desktop → mobile) and honors `prefers-reduced-motion`.
 
@@ -30,7 +30,6 @@ contested) and an importance weight, then rolled up into a per-name
 |------|--------------------------|
 | **ORCL** | RPO/backlog + conversion, OCI growth, AI run-rate, capex/rev, FCF margin, debt issuance, **2035 bond price/yield**, CDS spread, contracted DC power |
 | **MSFT** | Azure growth, AI run-rate, Copilot attach, capex/rev, FCF margin, cloud gross margin, DC power |
-| **HOOD** | net deposits, options volume, crypto volume, Gold subs, ARPU |
 | **NKE**  | gross margin, inventory, markdown intensity, Greater China sales, DTC trend |
 | **GEV**  | total backlog, gas-turbine slots, contracted GW, datacenter power orders, FCF margin, grid backlog |
 | *all*    | relative strength vs sector, IV rank/skew, insider selling, EPS revision trend |

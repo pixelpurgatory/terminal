@@ -26,7 +26,7 @@ const path = require('path');
   await page.waitForTimeout(2800);
   checks.priceAfterTick = await page.$eval('.dt-price', el => el.textContent.trim());
 
-  // Test switching via keyboard '3' (HOOD).
+  // Test switching via keyboard '3' (NKE).
   await page.keyboard.press('3');
   await page.waitForTimeout(300);
   checks.afterKey3 = await page.$eval('.dt-sym', el => el.textContent.trim());

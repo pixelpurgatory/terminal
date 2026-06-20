@@ -161,57 +161,6 @@ const STOCKS = {
     ],
   },
 
-  HOOD: {
-    name: "Robinhood Markets",
-    sector: "Fintech / Brokerage",
-    benchmark: "XLF",
-    price: 81.20,
-    vol: 0.045,
-    tag: "RETAIL FLOW MACHINE",
-    thesis:
-      "Robinhood is a leveraged bet on retail engagement: net deposits compound the " +
-      "account base while options + crypto volumes and Gold subscriptions monetize it. " +
-      "The risk is that all three are pro-cyclical and fade together.",
-    signals: [
-      { key: "deposits", label: "Net Deposits (qtr)", group: "Growth", value: "$18.4B", raw: 88,
-        delta: "+42% YoY", trend: "up", stance: "bull", weight: 3,
-        note: "Annualized ~50% growth rate — the cleanest read on franchise momentum.",
-        spark: SPARK(8, 18.4, 24, 0.1) },
-      { key: "options", label: "Options Volume (DARTs)", group: "Monetization", value: "2.1M/day", raw: 79,
-        delta: "+31% YoY", trend: "up", stance: "bull", weight: 3,
-        note: "Highest-margin transaction revenue; tracks retail risk appetite tightly.",
-        spark: SPARK(1.2, 2.1, 24, 0.14) },
-      { key: "crypto", label: "Crypto Volume (qtr)", group: "Monetization", value: "$52B", raw: 74,
-        delta: "+88% YoY", trend: "up", stance: "bull", weight: 2,
-        note: "Most volatile revenue line — huge upside, but the first to evaporate in a risk-off.",
-        spark: SPARK(14, 52, 24, 0.22) },
-      { key: "gold", label: "Gold Subscribers", group: "Growth", value: "4.6M", raw: 81,
-        delta: "+62% YoY", trend: "up", stance: "bull", weight: 2,
-        note: "Recurring, sticky revenue — the part of the model that de-cyclicalizes it.",
-        spark: SPARK(1.8, 4.6, 24, 0.08) },
-      { key: "arpu", label: "ARPU (annualized)", group: "Monetization", value: "$168", raw: 72,
-        delta: "+19% YoY", trend: "up", stance: "bull", weight: 2,
-        note: "Monetization per account rising — proof the cohort is maturing, not just growing.",
-        spark: SPARK(110, 168, 24, 0.09) },
-      { key: "rs", label: "Rel. Strength vs XLF", group: "Market", value: "+24.6%", raw: 86,
-        delta: "30d", trend: "up", stance: "bull", weight: 1,
-        note: "Crushing the financials sector — high-beta momentum leader.",
-        spark: SPARK(2, 24.6, 24, 0.2) },
-      { key: "iv", label: "IV Rank / Skew", group: "Market", value: "IVR 82 · call skew",
-        raw: 82, delta: "calls bid", trend: "up", stance: "neutral", weight: 1,
-        note: "Rich IV with upside skew — crowded long, vulnerable to a sentiment flip.",
-        spark: SPARK(45, 82, 24, 0.16) },
-      { key: "insider", label: "Insider Selling (90d)", group: "Market", value: "$240M", raw: 58,
-        delta: "founders trimming", trend: "up", stance: "bear", weight: 1,
-        note: "Founder/insider sales into the rip — worth monitoring at these multiples.",
-        spark: SPARK(40, 240, 24, 0.2) },
-      { key: "rev", label: "EPS Revision Trend", group: "Market", value: "+11.7%", raw: 84,
-        delta: "60d", trend: "up", stance: "bull", weight: 2,
-        note: "Estimates ripping higher on volume beats — strongest revision tape in the group.",
-        spark: SPARK(1, 11.7, 24, 0.18) },
-    ],
-  },
-
   NKE: {
     name: "NIKE, Inc.",
     sector: "Consumer Discretionary",
@@ -384,7 +333,7 @@ const STOCKS = {
   },
 };
 
-const STOCK_ORDER = ["ORCL", "MSFT", "HOOD", "NKE", "GEV"];
+const STOCK_ORDER = ["ORCL", "MSFT", "NKE", "GEV"];
 const NAV_ORDER = [...STOCK_ORDER, "MACRO"];
 
 // Social + professional sentiment — shown on each stock but weight 0, so they
