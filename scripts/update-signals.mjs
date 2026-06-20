@@ -85,9 +85,9 @@ function buildPrompt(sym, mode) {
   const L = [];
 
   if (mode === "news") {
-    L.push(`You are a markets news analyst updating a live terminal. Use the web_search tool to find, for ${s.name} (${sym}), the latest share price, today's % change, and the most recent top headlines. Verify from recent, credible finance sources — never guess, never reuse a stale number.`);
-    L.push(`\nReturn: price (number, no symbol), changePct (signed daily % e.g. -1.8; omit if unknown), asOf (date your figures reflect, ISO), summary (one sentence read on the name today), sources (1-4 URLs), news (up to 3 LATEST headlines, most recent first, each {title,url,source,stance}). For each headline, stance = how bullish/bearish that news is for the name — one of "strong_bull"|"bull"|"neutral"|"bear"|"strong_bear".`);
-    const shape = `{"stocks":{"${sym}":{"price":0,"changePct":0,"asOf":"YYYY-MM-DD","summary":"...","sources":["https://..."],"news":[{"title":"...","url":"https://...","source":"outlet","stance":"bull"}]}}}`;
+    L.push(`You are a markets news analyst updating a live terminal. Use the web_search tool to find, for ${s.name} (${sym}), the latest share price, today's % change, the NEXT scheduled earnings date, and THE SINGLE most important recent headline. Verify from recent, credible finance sources — never guess, never reuse a stale number.`);
+    L.push(`\nReturn: price (number, no symbol), changePct (signed daily % e.g. -1.8; omit if unknown), earnings (NEXT report date ISO "YYYY-MM-DD"; omit if unknown), asOf (date your figures reflect, ISO), summary (one sentence read on the name today), sources (1-2 URLs), news (ONLY the single most important recent headline, as a one-item array {title,url,source,stance}). stance = how bullish/bearish that news is for the name — one of "strong_bull"|"bull"|"neutral"|"bear"|"strong_bear".`);
+    const shape = `{"stocks":{"${sym}":{"price":0,"changePct":0,"earnings":"YYYY-MM-DD","asOf":"YYYY-MM-DD","summary":"...","sources":["https://..."],"news":[{"title":"...","url":"https://...","source":"outlet","stance":"bull"}]}}}`;
     L.push(`\nRespond with ONLY one JSON object, no prose, shape:\n${shape}`);
     return L.join("\n");
   }
@@ -97,7 +97,7 @@ function buildPrompt(sym, mode) {
   L.push(`You are a meticulous equity-research analyst updating a live signal terminal. Use the web_search tool to find the most recent real value for EACH signal below. Verify every figure from a recent, credible source (earnings release, 10-Q/10-K/8-K, IR deck, reputable finance/credit news) — never approximate from memory, never reuse a stale number. Assign each signal's stance from its own verified reading, not the overall vibe. OMIT any signal you can't credibly source (never guess).`);
   L.push(`\nTicker and signals to refresh: ${JSON.stringify(spec)}`);
   L.push(`\nPer signal return: value (short string WITH units, <=16 chars, e.g. "$462B","118 bps"), trend ("up"|"down"|"flat" = how the metric moved), stance ("bull"|"bear"|"neutral" = what the reading implies for the BULL thesis on that name), raw (0-100 strength for a gauge), note (one sentence <=130 chars).`);
-  L.push(`\nAlso return PER TICKER: price (number, no symbol), changePct (signed daily % e.g. -1.8; omit if unknown), earnings (NEXT report date ISO "YYYY-MM-DD"; omit if unknown), asOf (date your figures reflect, ISO), summary (one sentence read on the name), sources (1-4 URLs), news (up to 3 LATEST headlines, most recent first, each {title,url,source,stance}). For each headline, stance = how bullish/bearish that news is for the name — one of "strong_bull"|"bull"|"neutral"|"bear"|"strong_bear".`);
+  L.push(`\nAlso return PER TICKER: price (number, no symbol), changePct (signed daily % e.g. -1.8; omit if unknown), earnings (NEXT report date ISO "YYYY-MM-DD"; omit if unknown), asOf (date your figures reflect, ISO), summary (one sentence read on the name), sources (1-4 URLs), news (ONLY the single most important recent headline, as a one-item array {title,url,source,stance}). stance = how bullish/bearish that news is for the name — one of "strong_bull"|"bull"|"neutral"|"bear"|"strong_bear".`);
   L.push(`\nCoverage: try to source EVERY listed signal. Fundamentals (growth, margins, backlog/RPO, FCF, capex, gross margin, segment/China sales, subs, deposits, volumes, EPS-revision trend, relative strength vs the benchmark ETF) come from filings/IR/finance sites. Market signals not in filings (options IV-rank/skew, insider selling, relative strength) come from recent finance news/commentary — report the latest cited figure with its source.`);
   L.push(`\nSentiment signals (x_sent, reddit_sent, pro_sent) are display-only reads, not fundamentals: value = short read (e.g. "Bullish 70%","Mixed"), stance matching it, note citing what you saw (recent X/Twitter, Reddit, or sell-side ratings/PT changes).`);
   const shape = `{"stocks":{"${sym}":{"price":0,"changePct":0,"earnings":"YYYY-MM-DD","asOf":"YYYY-MM-DD","summary":"...","sources":["https://..."],"news":[{"title":"...","url":"https://...","source":"outlet","stance":"bull"}],"signals":{"signalKey":{"value":"...","trend":"up","stance":"bull","raw":0,"note":"..."}}}}}`;
@@ -141,12 +141,12 @@ function validateStock(sym, incoming, mode = "full") {
       if (typeof v.note === "string" && v.note.trim()) entry.note = v.note.trim().slice(0, 160);
       if (entry.value) stock.signals[key] = entry; // a signal is only useful with a real value
     }
-    if (typeof incoming.earnings === "string" && /^\d{4}-\d{2}-\d{2}$/.test(incoming.earnings.trim())) {
-      stock.earnings = incoming.earnings.trim();
-    }
   }
   if (Number.isFinite(incoming.price)) stock.price = incoming.price;
   if (Number.isFinite(incoming.changePct)) stock.changePct = incoming.changePct;
+  if (typeof incoming.earnings === "string" && /^\d{4}-\d{2}-\d{2}$/.test(incoming.earnings.trim())) {
+    stock.earnings = incoming.earnings.trim();  // next earnings date (both modes)
+  }
   if (typeof incoming.asOf === "string") stock.asOf = incoming.asOf.slice(0, 10);
   if (typeof incoming.summary === "string") stock.summary = incoming.summary.trim().slice(0, 240);
   if (Array.isArray(incoming.sources)) {
@@ -158,7 +158,7 @@ function validateStock(sym, incoming, mode = "full") {
     stock.news = incoming.news
       .filter((n) => n && typeof n.title === "string" && n.title.trim() &&
                      typeof n.url === "string" && /^https?:\/\//.test(n.url))
-      .slice(0, 3)
+      .slice(0, 1)   // only the single most important latest headline
       .map((n) => {
         const item = {
           title: n.title.trim().slice(0, 160),

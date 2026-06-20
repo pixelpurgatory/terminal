@@ -80,7 +80,7 @@ function verdict(sym) {
 }
 function daysUntil(d) { const t = Date.parse(d + "T00:00:00Z"); return Number.isFinite(t) ? Math.round((t - Date.now()) / 864e5) : null; }
 const fmtMoney = (n) => "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const topNews = (st, max = 3) => (Array.isArray(st.news) ? st.news : []).slice(0, max);
+const topNews = (st, max = 1) => (Array.isArray(st.news) ? st.news : []).slice(0, max);
 
 /* ---------- Compose (price + latest news, per stock) ---------- */
 function build() {

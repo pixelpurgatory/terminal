@@ -157,9 +157,9 @@
     });
   }
 
-  // Top-3 breaking news panel (under the signal cards).
+  // Single most-important headline panel (under the signal cards).
   function newsHTML(ls) {
-    const news = (ls && Array.isArray(ls.news)) ? ls.news.slice(0, 3) : [];
+    const news = (ls && Array.isArray(ls.news)) ? ls.news.slice(0, 1) : [];
     if (!news.length) return "";
     return `
       <section class="group news">
