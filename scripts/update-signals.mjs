@@ -7,8 +7,8 @@
  *  and data/live.json (a human-readable record).
  *
  *  The curated model in js/data.js is the single source of truth for WHICH
- *  signals exist; this script researches their VALUES in two calls (all equities
- *  together, then the MACRO regime). Anything the model can't verify is omitted (never faked); the UI shows only
+ *  signals exist; this script researches their VALUES one entry per call (each
+ *  ticker, then the MACRO regime). Anything the model can't verify is omitted (never faked); the UI shows only
  *  the signals that came back with a real value.
  *
  *  Usage:
@@ -71,9 +71,8 @@ function buildSpec(sym) {
 }
 
 /* ---------- Prompt ---------- */
-// One call covers a small GROUP of equities (cheaper than one call per name, but
-// small enough to stay under the TPM limit); MACRO is its own call with its own,
-// lighter rules. JSON is sent compact to save tokens.
+// One entry per call (kept small to stay under the per-minute token limit).
+// Stocks and MACRO get different guidance. JSON is sent compact to save tokens.
 function buildPrompt(syms) {
   const macro = syms.length === 1 && !!(STOCKS[syms[0]] && STOCKS[syms[0]].macro);
   const specs = {};
@@ -222,31 +221,30 @@ async function researchGroup(client, candidates, syms) {
   return { stocks: {}, model: null, accessError: true };
 }
 
-// Equities per call. Small groups keep each call under the per-minute token
-// limit: web_search re-ingests page content every turn, so one big multi-ticker
-// call blows past TPM (a single 4-ticker call used ~184k tok/min vs a 200k cap).
-const GROUP_SIZE = 2;
+// Run fn over items with bounded concurrency (fast, but gentle on rate limits).
+async function mapPool(items, concurrency, fn) {
+  const out = new Array(items.length);
+  let i = 0;
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (i < items.length) { const idx = i++; out[idx] = await fn(items[idx], idx); }
+  });
+  await Promise.all(workers);
+  return out;
+}
 
 async function research() {
   const { default: OpenAI } = await import("openai");
-  // maxRetries lets the SDK wait out transient 429s at call boundaries.
-  const client = new OpenAI({ timeout: 540000, maxRetries: 4 });
+  const client = new OpenAI({ timeout: 540000, maxRetries: 1 }); // 9 min/call, 1 retry
   const candidates = process.env.SIGNAL_MODEL
     ? [{ model: process.env.SIGNAL_MODEL, tool: process.env.SIGNAL_SEARCH_TOOL || "web_search" }]
     : MODEL_CANDIDATES;
 
-  // Equities in small groups, then a separate lighter MACRO call. Far fewer
-  // calls than one-per-name, but small enough to stay under the TPM limit.
-  const groups = [];
-  for (let i = 0; i < STOCK_ORDER.length; i += GROUP_SIZE) {
-    groups.push(STOCK_ORDER.slice(i, i + GROUP_SIZE));
-  }
-  console.log(`Researching equities in ${groups.length} calls of <=${GROUP_SIZE} + MACRO separately`);
-
-  const out = {};
-  // First group resolves the working model (cheap on access errors).
-  const firstRun = await researchGroup(client, candidates, groups[0]);
-  if (firstRun.accessError) {
+  // ONE web-search call per entry (4 equities + MACRO = 5 calls). Each call is
+  // small, so it stays well under the per-minute token limit — combining names
+  // into one call blew past TPM. The first entry resolves the working model;
+  // the rest run through a small concurrency pool pinned to it.
+  const first = await researchGroup(client, candidates, [NAV_ORDER[0]]);
+  if (first.accessError) {
     let available = "(could not list models)";
     try {
       const list = await client.models.list();
@@ -257,15 +255,12 @@ async function research() {
       `Grant this key's project access to one, or set SIGNAL_MODEL to a model from: ${available}`
     );
   }
-  const pinned = candidates.find((c) => c.model === firstRun.model) || candidates[0];
-  Object.assign(out, firstRun.stocks);
+  const pinned = candidates.find((c) => c.model === first.model) || candidates[0];
+  console.log(`Researching ${NAV_ORDER.length} entries (one call each) with ${pinned.model}, concurrency 3`);
 
-  for (const g of groups.slice(1)) {
-    const r = await researchGroup(client, [pinned], g);
-    Object.assign(out, r.stocks);
-  }
-  const macroRun = await researchGroup(client, [pinned], ["MACRO"]);
-  Object.assign(out, macroRun.stocks);
+  const out = { ...first.stocks };
+  const rest = await mapPool(NAV_ORDER.slice(1), 3, (sym) => researchGroup(client, [pinned], [sym]));
+  for (const r of rest) Object.assign(out, r.stocks);
 
   if (!Object.keys(out).length) throw new Error("No valid data produced for any entry");
   return out;
