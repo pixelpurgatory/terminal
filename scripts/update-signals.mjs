@@ -402,6 +402,12 @@ function mergeHistory(stocks) {
         if (psig.stance && psig.stance !== sig.stance) sig.stanceFrom = psig.stance;
       }
     }
+    // Flag headlines not seen in the previous run (for change-only briefs).
+    if (Array.isArray(s.news)) {
+      const prevUrls = new Set((ps && Array.isArray(ps.news) ? ps.news : []).map((n) => n.url));
+      const hadPrev = prevUrls.size > 0;
+      for (const n of s.news) n.isNew = hadPrev ? !prevUrls.has(n.url) : true;
+    }
   }
 }
 

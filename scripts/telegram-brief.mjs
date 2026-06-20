@@ -78,58 +78,87 @@ function verdict(sym) {
   if (pct > -45) return { pct, label: "BEARISH" };
   return { pct, label: "STRONG BEAR" };
 }
-const flips = (sym) => liveSignals(sym).filter((g) => g.stanceFrom && g.stanceFrom !== g.stance);
 function daysUntil(d) { const t = Date.parse(d + "T00:00:00Z"); return Number.isFinite(t) ? Math.round((t - Date.now()) / 864e5) : null; }
+const fmtMoney = (n) => "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const UP = (s) => (s || "").toUpperCase();
 
-/* ---------- Compose ---------- */
+// What changed for a signal since the previous run: a stance flip or a >=10% move.
+function change(g) {
+  if (g.stanceFrom && g.stanceFrom !== g.stance) return { kind: "flip", text: `${UP(g.stanceFrom)}→${UP(g.stance)}` };
+  if (Array.isArray(g.hist) && g.hist.length >= 2) {
+    const a = g.hist[g.hist.length - 2], b = g.hist[g.hist.length - 1];
+    if (Number.isFinite(a) && Number.isFinite(b) && a !== 0) {
+      const p = ((b - a) / Math.abs(a)) * 100;
+      if (Math.abs(p) >= 10) return { kind: "move", text: `${p >= 0 ? "+" : ""}${p.toFixed(0)}% vs prev`, dir: p >= 0 ? "up" : "down" };
+    }
+  }
+  return null;
+}
+const changesFor = (sym) => liveSignals(sym).map((g) => ({ g, c: change(g) })).filter((x) => x.c);
+// New headlines: those flagged isNew; if the flag is absent (older data) show the latest one.
+function freshNews(st, max = 2) {
+  const news = Array.isArray(st.news) ? st.news : [];
+  const hasFlag = news.some((n) => "isNew" in n);
+  return (hasFlag ? news.filter((n) => n.isNew) : news.slice(0, 1)).slice(0, max);
+}
+
+/* ---------- Compose (change-only) ---------- */
 function build() {
   const title = SESSION === "close" ? "CLOSING WRAP" : "MORNING BRIEF";
   const date = new Date().toISOString().slice(0, 10);
+  const time = (LIVE.generatedAt || "").slice(11, 16);
   const L = [];
-  L.push(`🟩 <b>MATRIX // ${title}</b> · ${date}`);
+  L.push(`🟩 <b>MATRIX — ${title}</b>`);
+  L.push(`<i>${date} · feed ${esc(time)} UTC · only what changed</i>`);
 
-  // Macro block
+  // ---- What's new (flips across everything) ----
+  const macroCh = LIVE.stocks.MACRO ? changesFor("MACRO") : [];
+  const stockCh = {}; for (const s of STOCK_ORDER) stockCh[s] = LIVE.stocks[s] ? changesFor(s) : [];
+  const flips = [
+    ...STOCK_ORDER.flatMap((s) => stockCh[s].filter((x) => x.c.kind === "flip").map((x) => `${s} · ${x.g.label} ${x.c.text}`)),
+    ...macroCh.filter((x) => x.c.kind === "flip").map((x) => `MACRO · ${x.g.label} ${x.c.text}`),
+  ];
+  L.push("");
+  L.push("<b>━━━━ ⚡ WHAT'S NEW ━━━━</b>");
+  if (flips.length) flips.forEach((f) => L.push(`⚡ ${esc(f)}`));
+  else L.push("<i>No stance/regime changes since last brief.</i>");
+
+  // ---- Macro ----
   if (LIVE.stocks.MACRO) {
     const mv = verdict("MACRO");
     const dot = mv.label.includes("OFF") ? "🔴" : mv.label.includes("ON") ? "🟢" : "🟡";
-    L.push(`\n${dot} <b>MACRO: ${esc(mv.label)}</b>`);
-    const levels = ["spx", "vix", "us10y", "wti", "brent", "dxy", "hy", "gold"]
-      .map((k) => sig("MACRO", k)).filter(Boolean)
-      .map((g) => `${esc(g.label)} <b>${esc(g.value)}</b>`);
-    if (levels.length) L.push(levels.join(" · "));
-    const geo = ["iran", "ukraine", "cuba", "taiwan"].map((k) => sig("MACRO", k)).filter(Boolean)
-      .map((g) => `${STANCE[g.stance] || ""} ${esc(g.label)}: ${esc(g.value)}`);
-    if (geo.length) L.push("🌍 " + geo.join(" · "));
+    L.push("");
+    L.push(`<b>━━━━ 🌍 MACRO ━━━━</b>`);
+    L.push(`${dot} <b>Regime: ${esc(mv.label)}</b>`);
+    macroCh.forEach(({ g, c }) =>
+      L.push(`${c.kind === "flip" ? "⚡" : (c.dir === "up" ? "🔼" : "🔽")} ${esc(g.label)}: <b>${esc(g.value)}</b> (${esc(c.text)})`));
+    freshNews(LIVE.stocks.MACRO).forEach((n) => L.push(`📰 <a href="${esc(n.url)}">${esc(n.title)}</a>`));
+    if (!macroCh.length && !freshNews(LIVE.stocks.MACRO).length) L.push("<i>No macro changes.</i>");
   }
 
-  // Per-stock detail
+  // ---- Stocks: compact status + only changes + new headlines + earnings ----
+  L.push("");
+  L.push("<b>━━━━ 📈 STOCKS ━━━━</b>");
   for (const sym of STOCK_ORDER) {
     const st = LIVE.stocks[sym];
     if (!st) continue;
     const v = verdict(sym);
     const dot = v.label.includes("BULL") ? "🟢" : v.label.includes("BEAR") ? "🔴" : "🟡";
-    const px = Number.isFinite(st.price) ? `$${st.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "";
-    const chg = Number.isFinite(st.changePct) ? `${st.changePct >= 0 ? "▲" : "▼"}${Math.abs(st.changePct).toFixed(2)}%` : "";
-    L.push(`\n${dot} <b>${sym}</b> ${px} ${chg} — <b>${esc(v.label)}</b>`);
-
-    const ed = st.earnings ? daysUntil(st.earnings) : null;
-    if (ed != null && ed >= 0 && ed <= 10) L.push(`⏱ earnings in ${ed}d (${esc(st.earnings)})`);
-
-    // top 3 weighted signals
-    const top = liveSignals(sym).filter((g) => g.weight).sort((a, b) => b.weight - a.weight).slice(0, 3);
-    for (const g of top) L.push(`  ${STANCE[g.stance] || ""} ${esc(g.label)}: <b>${esc(g.value)}</b>${g.delta ? " (" + esc(g.delta) + ")" : ""}`);
-
-    const fl = flips(sym);
-    for (const g of fl) L.push(`  ⚡ <b>${esc(g.label)}</b> flipped ${esc(g.stanceFrom)}→${esc(g.stance)}`);
-
-    if (Array.isArray(st.news) && st.news[0]) L.push(`  📰 <a href="${esc(st.news[0].url)}">${esc(st.news[0].title)}</a>`);
+    const px = Number.isFinite(st.price) ? fmtMoney(st.price) : "";
+    const cp = Number.isFinite(st.changePct) ? `${st.changePct >= 0 ? "▲" : "▼"}${Math.abs(st.changePct).toFixed(2)}%` : "";
+    L.push("");
+    L.push(`${dot} <b>${sym}</b> ${px} ${cp} · ${esc(v.label)}`);
+    if (st.earnings) {
+      const d = daysUntil(st.earnings);
+      L.push(`📅 Earnings: <b>${esc(st.earnings)}</b>${d != null ? ` (${d < 0 ? "reported" : "in " + d + "d"})` : ""}`);
+    }
+    stockCh[sym].forEach(({ g, c }) =>
+      L.push(`${c.kind === "flip" ? "⚡" : (c.dir === "up" ? "🔼" : "🔽")} ${esc(g.label)}: <b>${esc(g.value)}</b> (${esc(c.text)})`));
+    freshNews(st).forEach((n) => L.push(`📰 <a href="${esc(n.url)}">${esc(n.title)}</a>`));
   }
 
-  // Aggregate flips
-  const allFlips = STOCK_ORDER.flatMap((s) => flips(s).map((g) => `${s} ${g.label} ${g.stanceFrom}→${g.stance}`));
-  if (allFlips.length) L.push(`\n⚠ <b>Flips today:</b> ${esc(allFlips.join(" · "))}`);
-
-  L.push(`\n<a href="${esc(URL)}">Open terminal</a> · feed ${esc((LIVE.generatedAt || "").slice(0, 16).replace("T", " "))} UTC · ${esc(LIVE.model || "")}`);
+  L.push("");
+  L.push(`<a href="${esc(URL)}">Open terminal ▸</a> · ${esc(LIVE.model || "")}`);
   return L.join("\n");
 }
 
