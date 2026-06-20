@@ -43,7 +43,7 @@ const DRY_RUN = process.argv.includes("--dry-run");
 // (newer models use "web_search"; gpt-4o uses the legacy "web_search_preview").
 // Pin one with SIGNAL_MODEL (tool defaults to web_search; override SIGNAL_SEARCH_TOOL).
 const MODEL_CANDIDATES = [
-  { model: "gpt-5.5", tool: "web_search" },
+  { model: "gpt-5.4-mini", tool: "web_search" },
   { model: "gpt-4.1", tool: "web_search" },
   { model: "gpt-4.1-mini", tool: "web_search" },
   { model: "gpt-4o", tool: "web_search_preview" },

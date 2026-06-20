@@ -64,7 +64,7 @@ python3 -m http.server 8080   # then visit http://localhost:8080
 
 The terminal can refresh its own signals. A research agent lives in the repo and
 runs **once a day, ~1 hour before the US market open** (GitHub Actions cron): it calls **OpenAI (Responses API)
-with web search** — trying `gpt-5.5` → `gpt-4.1` → `gpt-4.1-mini` and using the
+with web search** — trying `gpt-5.4-mini` → `gpt-4.1` → `gpt-4.1-mini` and using the
 first your project can access (or pin one with the `SIGNAL_MODEL` env var). It looks up the latest real-world value for every
 signal defined in `js/data.js`, and commits the result to `js/live-data.js`. The terminal loads
 that file and renders **only that real data** — the feed chip shows **`◉ LIVE`**
