@@ -205,21 +205,24 @@ const isAccessError = (msg) =>
 async function researchOne(client, candidates, sym, mode) {
   const input = buildPrompt(sym, mode);
   // max_output_tokens is a CAP, not a charge — billing is per token actually
-  // produced — so leave generous headroom to avoid truncated JSON.
-  const maxTokens = mode === "news" ? 4000 : 12000;
+  // produced. news runs reasoning "high", which consumes a lot of the budget, so
+  // give it real headroom or the visible JSON gets starved/truncated.
+  const maxTokens = mode === "news" ? 10000 : 12000;
+  // Per-mode reasoning effort: news = "high" (small payload, deeper read of the
+  // headlines); full = "low" (cheaper + lighter on TPM for heavy signal calls).
+  const effort = mode === "news" ? "high" : "low";
   for (const { model, tool } of candidates) {
     try {
-      // Reasoning models (gpt-5.x) spend part of the output budget on hidden
-      // reasoning, re-counted every search turn — so effort "low" is a big cost
-      // (and TPM) saving. search_context_size "low" likewise trims how much web
-      // content is ingested per search. (Older models reject the reasoning param.)
+      // Reasoning tokens (gpt-5.x) are re-counted every web_search turn, so they
+      // dominate cost/TPM. search_context_size "low" trims web content ingested
+      // per search. (Older non-reasoning models reject the reasoning param.)
       const req = {
         model,
         tools: [{ type: tool, search_context_size: "low" }],
         max_output_tokens: maxTokens,
         input,
       };
-      if (/^gpt-5/.test(model)) req.reasoning = { effort: "low" };
+      if (/^gpt-5/.test(model)) req.reasoning = { effort };
       const response = await client.responses.create(req);
       const text = (response.output_text || "").trim();
       if (!text) throw new Error("empty output");
