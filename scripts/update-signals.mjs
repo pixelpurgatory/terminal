@@ -174,9 +174,14 @@ async function researchOne(client, candidates, sym) {
   const input = buildPrompt(sym);
   for (const { model, tool } of candidates) {
     try {
-      const response = await client.responses.create({
-        model, tools: [{ type: tool }], max_output_tokens: 5000, input,
-      });
+      // max_output_tokens is a CAP, not a charge — billing is per token actually
+      // produced, so we keep generous headroom to avoid truncated JSON. Reasoning
+      // models (gpt-5.x) spend part of this budget on hidden reasoning, so cap the
+      // effort to "medium": cheaper/faster and still leaves room for the full JSON.
+      // (Older models reject the reasoning param, so only send it for gpt-5.x.)
+      const req = { model, tools: [{ type: tool }], max_output_tokens: 16000, input };
+      if (/^gpt-5/.test(model)) req.reasoning = { effort: "medium" };
+      const response = await client.responses.create(req);
       const text = (response.output_text || "").trim();
       if (!text) throw new Error("empty output");
       usedModel = model;
