@@ -290,30 +290,6 @@
       </section>`;
   }
 
-  // Compact macro backdrop shown at the bottom of each stock view.
-  function macroPanelHTML() {
-    const mv = verdict("MACRO");
-    if (!mv.n) return "";
-    const chip = (k) => {
-      const g = liveSig("MACRO", k);
-      return g ? `<span class="mp-chip ${g.stance}"><b>${esc(g.label)}</b> ${esc(g.value)}</span>` : "";
-    };
-    const market = ["wti", "spx", "vix", "us10y", "dxy", "hy", "gold"].map(chip).join("");
-    const geo = ["iran", "ukraine", "cuba", "taiwan"].map((k) => {
-      const g = liveSig("MACRO", k);
-      return g ? `<span class="mp-geo ${g.stance}" title="${esc(g.note)}">${esc(g.label)}: ${esc(g.value)}</span>` : "";
-    }).join("");
-    return `
-      <section class="group macro-panel">
-        <h3 class="group-h"><span>MACRO BACKDROP</span><i></i>
-          <button class="mp-open" data-macro title="open full macro view">OPEN ▸</button></h3>
-        <div class="mp-row">
-          <span class="dt-regime sm ${mv.cls}">${verdictDisplay("MACRO", mv)}</span>${market}
-        </div>
-        ${geo ? `<div class="mp-geo-row">${geo}</div>` : ""}
-      </section>`;
-  }
-
   /* ---------- Detail panel ---------- */
   function buildDetail(sym) {
     const s = STOCKS[sym];
@@ -434,8 +410,6 @@
 
       ${newsHTML(ls)}
 
-      ${isMacro(sym) ? "" : macroPanelHTML()}
-
       <footer class="dt-foot">
         ${feedBadge()}
         <span>${v.n} live signal${v.n === 1 ? "" : "s"} · sentiment shown but unweighted</span>
@@ -443,9 +417,6 @@
     `;
 
     drawAllSparks(root);
-
-    const openMacro = $("[data-macro]", root);
-    if (openMacro) openMacro.addEventListener("click", () => selectStock("MACRO"));
 
     // Animate verdict fill width.
     requestAnimationFrame(() => {
