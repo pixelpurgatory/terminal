@@ -57,7 +57,8 @@ const NEWS_TAG = {
 // One formatted headline line, prefixed with its bull/bear rating when present.
 function newsLine(n) {
   const tag = NEWS_TAG[n.stance];
-  return `📰 ${tag ? `<b>[${tag}]</b> ` : ""}<a href="${esc(n.url)}">${esc(n.title)}</a>`;
+  const date = n.date ? ` <i>(${esc(n.date)})</i>` : "";
+  return `📰 ${tag ? `<b>[${tag}]</b> ` : ""}<a href="${esc(n.url)}">${esc(n.title)}</a>${date}`;
 }
 function liveSignals(sym) {
   const ls = LIVE.stocks[sym];

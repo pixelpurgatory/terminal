@@ -170,7 +170,7 @@
               <a href="${esc(n.url)}" target="_blank" rel="noopener">
                 <span class="news-dot"></span><span class="news-title">${esc(n.title)}</span>
               </a>
-              ${n.source ? `<span class="news-src">${esc(n.source)}</span>` : ""}
+              ${n.source ? `<span class="news-src">${esc(n.source)}${n.date ? " · " + esc(n.date) : ""}</span>` : (n.date ? `<span class="news-src">${esc(n.date)}</span>` : "")}
             </li>`).join("")}
         </ul>
       </section>`;

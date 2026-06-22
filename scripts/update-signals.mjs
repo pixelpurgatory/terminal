@@ -94,12 +94,16 @@ function buildSpec(sym) {
 // only the latest price + headlines (the cheap daily brief). JSON kept compact.
 function buildPrompt(sym, mode) {
   const s = STOCKS[sym];
+  const today = new Date().toISOString().slice(0, 10);
+  const since = new Date(Date.now() - 2 * 864e5).toISOString().slice(0, 10);
+  const recency = `Today is ${today}. ONLY include headlines published on or after ${since} (the last 2 days) — skip anything older even if important; if fewer than 3 qualify, return only those (or none). Give each headline's publication date as date (ISO YYYY-MM-DD).`;
   const L = [];
 
   if (mode === "news") {
-    L.push(`You are a markets news analyst updating a live terminal. Use the web_search tool to find, for ${s.name} (${sym}), the latest share price, today's % change, the NEXT scheduled earnings date, and the 3 most important recent headlines. Verify from recent, credible finance sources — never guess, never reuse a stale number. Be economical: a few quick searches per name, no deep multi-source digging.`);
-    L.push(`\nReturn: price (number, no symbol), changePct (signed daily % e.g. -1.8; omit if unknown), earnings (NEXT report date ISO "YYYY-MM-DD"; omit if unknown), asOf (date your figures reflect, ISO), summary (one sentence read on the name today), sources (1-3 URLs), news (the 3 most important recent headlines, most important first, each {title,url,source,stance}). stance = how bullish/bearish that news is for the name — one of "strong_bull"|"bull"|"neutral"|"bear"|"strong_bear".`);
-    const shape = `{"stocks":{"${sym}":{"price":0,"changePct":0,"earnings":"YYYY-MM-DD","asOf":"YYYY-MM-DD","summary":"...","sources":["https://..."],"news":[{"title":"...","url":"https://...","source":"outlet","stance":"bull"}]}}}`;
+    L.push(`You are a markets news analyst updating a live terminal. Use the web_search tool to find, for ${s.name} (${sym}), the latest share price, today's % change, the NEXT scheduled earnings date, and the 3 most important headlines from the last 2 days. Verify from recent, credible finance sources — never guess, never reuse a stale number. Be economical: a few quick searches per name, no deep multi-source digging.`);
+    L.push(`\n${recency}`);
+    L.push(`\nReturn: price (number, no symbol), changePct (signed daily % e.g. -1.8; omit if unknown), earnings (NEXT report date ISO "YYYY-MM-DD"; omit if unknown), asOf (date your figures reflect, ISO), summary (one sentence read on the name today), sources (1-3 URLs), news (up to 3 most important headlines from the last 2 days, most important first, each {title,url,source,date,stance}). stance = how bullish/bearish that news is for the name — one of "strong_bull"|"bull"|"neutral"|"bear"|"strong_bear".`);
+    const shape = `{"stocks":{"${sym}":{"price":0,"changePct":0,"earnings":"YYYY-MM-DD","asOf":"YYYY-MM-DD","summary":"...","sources":["https://..."],"news":[{"title":"...","url":"https://...","source":"outlet","date":"YYYY-MM-DD","stance":"bull"}]}}}`;
     L.push(`\nRespond with ONLY one JSON object, no prose, shape:\n${shape}`);
     return L.join("\n");
   }
@@ -109,10 +113,10 @@ function buildPrompt(sym, mode) {
   L.push(`You are a meticulous equity-research analyst updating a live signal terminal. Use the web_search tool to find the most recent real value for EACH signal below. Verify every figure from a recent, credible source (earnings release, 10-Q/10-K/8-K, IR deck, reputable finance/credit news) — never approximate from memory, never reuse a stale number. Assign each signal's stance from its own verified reading, not the overall vibe. OMIT any signal you can't credibly source (never guess).`);
   L.push(`\nTicker and signals to refresh: ${JSON.stringify(spec)}`);
   L.push(`\nPer signal return: value (short string WITH units, <=16 chars, e.g. "$462B","118 bps"), trend ("up"|"down"|"flat" = how the metric moved), stance ("bull"|"bear"|"neutral" = what the reading implies for the BULL thesis on that name), raw (0-100 strength for a gauge), note (one sentence <=130 chars).`);
-  L.push(`\nAlso return PER TICKER: price (number, no symbol), changePct (signed daily % e.g. -1.8; omit if unknown), earnings (NEXT report date ISO "YYYY-MM-DD"; omit if unknown), asOf (date your figures reflect, ISO), summary (one sentence read on the name), sources (1-4 URLs), news (the 3 most important recent headlines, most important first, each {title,url,source,stance}). stance = how bullish/bearish that news is for the name — one of "strong_bull"|"bull"|"neutral"|"bear"|"strong_bear".`);
+  L.push(`\nAlso return PER TICKER: price (number, no symbol), changePct (signed daily % e.g. -1.8; omit if unknown), earnings (NEXT report date ISO "YYYY-MM-DD"; omit if unknown), asOf (date your figures reflect, ISO), summary (one sentence read on the name), sources (1-4 URLs), news (up to 3 most important headlines from the last 2 days, most important first, each {title,url,source,date,stance}). stance = how bullish/bearish that news is for the name — one of "strong_bull"|"bull"|"neutral"|"bear"|"strong_bear". ${recency}`);
   L.push(`\nCoverage: try to source EVERY listed signal. Fundamentals (growth, margins, backlog/RPO, FCF, capex, gross margin, segment/China sales, subs, deposits, volumes, EPS-revision trend, relative strength vs the benchmark ETF) come from filings/IR/finance sites. Market signals not in filings (options IV-rank/skew, insider selling, relative strength) come from recent finance news/commentary — report the latest cited figure with its source.`);
   L.push(`\nSentiment signals (x_sent, reddit_sent, pro_sent) are display-only reads, not fundamentals: value = short read (e.g. "Bullish 70%","Mixed"), stance matching it, note citing what you saw (recent X/Twitter, Reddit, or sell-side ratings/PT changes).`);
-  const shape = `{"stocks":{"${sym}":{"price":0,"changePct":0,"earnings":"YYYY-MM-DD","asOf":"YYYY-MM-DD","summary":"...","sources":["https://..."],"news":[{"title":"...","url":"https://...","source":"outlet","stance":"bull"}],"signals":{"signalKey":{"value":"...","trend":"up","stance":"bull","raw":0,"note":"..."}}}}}`;
+  const shape = `{"stocks":{"${sym}":{"price":0,"changePct":0,"earnings":"YYYY-MM-DD","asOf":"YYYY-MM-DD","summary":"...","sources":["https://..."],"news":[{"title":"...","url":"https://...","source":"outlet","date":"YYYY-MM-DD","stance":"bull"}],"signals":{"signalKey":{"value":"...","trend":"up","stance":"bull","raw":0,"note":"..."}}}}}`;
   L.push(`\nRespond with ONLY one JSON object, no prose, shape:\n${shape}`);
   return L.join("\n");
 }
@@ -167,19 +171,25 @@ function validateStock(sym, incoming, mode = "full") {
       .slice(0, 4);
   }
   if (Array.isArray(incoming.news)) {
+    // Hard recency guard: drop anything dated more than 2 days ago (when a
+    // parseable date is given). Undated items are kept (the prompt constrains them).
+    const todayMid = Date.parse(new Date().toISOString().slice(0, 10) + "T00:00:00Z");
+    const tooOld = (d) => { const t = Date.parse(d + "T00:00:00Z"); return Number.isFinite(t) && (todayMid - t) / 864e5 > 2; };
     stock.news = incoming.news
       .filter((n) => n && typeof n.title === "string" && n.title.trim() &&
                      typeof n.url === "string" && /^https?:\/\//.test(n.url))
-      .slice(0, 3)   // the 3 most important recent headlines
       .map((n) => {
         const item = {
           title: n.title.trim().slice(0, 160),
           url: n.url,
           source: typeof n.source === "string" ? n.source.trim().slice(0, 40) : "",
         };
+        if (typeof n.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(n.date.trim())) item.date = n.date.trim();
         if (NEWS_STANCES.has(n.stance)) item.stance = n.stance;
         return item;
-      });
+      })
+      .filter((item) => !(item.date && tooOld(item.date)))  // only the last 2 days
+      .slice(0, 3);
   }
   if (mode === "full") return Object.keys(stock.signals).length ? stock : null;
   return (Number.isFinite(stock.price) || (stock.news && stock.news.length)) ? stock : null;
@@ -311,6 +321,7 @@ function mock() {
         title: `[MOCK] ${sym} breaking headline ${i}`,
         url: "https://example.com/" + sym.toLowerCase() + "/" + i,
         source: "Mock Wire",
+        date: new Date(Date.now() - (i - 1) * 864e5).toISOString().slice(0, 10),
         stance: ["strong_bull", "bull", "neutral", "bear", "strong_bear"][(i - 1) % 5],
       })),
       signals,
