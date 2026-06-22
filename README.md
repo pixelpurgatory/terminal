@@ -47,7 +47,7 @@ one-time toggle (the repo's CI token can't enable Pages on its own):
 
 In branch mode GitHub serves the site directly and **rebuilds on every commit** —
 so a **full update** (which commits `js/live-data.js`) shows up automatically, no
-extra workflow. (The daily news run is Telegram-only and does not commit.)
+extra workflow. (A news run is Telegram-only and does not commit.)
 
 ## Run it locally
 
@@ -72,15 +72,18 @@ runs in one of two **modes**:
   `js/live-data.js` + `data/live.json`, and **commits them** (updates the site).
   Triggered by the in-terminal **⟳ FULL UPDATE** button (max once / 24h) or
   manually via *Actions → Run workflow*.
-- **`news`** (the daily schedule) — researches only the latest **price + headlines**
-  and sends the **Telegram brief**. It does **not** touch the website.
+- **`news`** — researches only the latest **price + headlines** and sends the
+  **Telegram brief**. It does **not** touch the website. Manual only (run via
+  *Actions → Run workflow* with mode `news`).
 
 The terminal renders **only real data** — the feed chip shows **`◉ LIVE`** with a
 timestamp, each name gets an **AI READ** summary with source links, and missing
 data shows a **`◉ NO LIVE DATA`** notice rather than fake values.
 
+> **No automatic schedule.** Updates run only when you trigger them (the button
+> or *Run workflow*); nothing runs on its own.
+
 ```
-Daily cron (1×/day, ~1h pre-open)  → SIGNAL_MODE=news → Telegram brief only
 ⟳ FULL UPDATE button / manual run  → SIGNAL_MODE=full → commit js/live-data.js + data/live.json
                                                           └─ terminal overlays the values
 ```
@@ -103,13 +106,13 @@ left out (the UI keeps the curated fallback).
 
 1. Add a repo secret named **`matrix`** holding an **OpenAI API key** (Settings →
    Secrets and variables → Actions). The workflow exposes it to the script as `OPENAI_API_KEY`.
-2. For the *scheduled* runs to fire, the workflow must live on the repo's
-   **default branch** (GitHub only schedules from there). You can also trigger it
-   anytime via **Actions → "Update signals" → Run workflow**.
+2. Trigger it via the in-terminal **⟳ FULL UPDATE** button, or **Actions →
+   "Update signals" → Run workflow** (pick mode `full` or `news`). There is no
+   automatic schedule.
 
 ### Telegram brief (optional)
 
-The daily job DMs you a **news brief** once a day (~1h before the open):
+A **news brief** is DM'd whenever you run the workflow in `news` mode:
 per-stock price, daily change, and the latest rated headlines (a verdict line too
 when a full update has populated signals). To enable, add two repo secrets:
 

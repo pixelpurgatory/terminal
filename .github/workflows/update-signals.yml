@@ -1,25 +1,16 @@
 name: Update signals (AI research)
 
-# TWO purposes, selected by `mode`:
-#   • news (the daily schedule) — research only latest price + headlines and send
-#     the Telegram brief. Does NOT touch the website (no commit).
-#   • full (manual / the in-terminal button) — research ALL signals + price + news,
-#     commit js/live-data.js + data/live.json (updates the site), then Telegram.
-#
-# The scheduled cron runs ONCE a day, ~1h before the US open (08:30 America/New_York).
-# GitHub cron is UTC-only and ignores US DST, so both candidate UTC times are listed
-# and a `gate` job lets exactly one through — the one that is 08:30 in New York.
+# MANUAL-ONLY. The daily auto news schedule has been removed — this workflow
+# runs only when triggered, selected by `mode`:
+#   • full — research ALL signals + price + news, commit js/live-data.js +
+#     data/live.json (updates the site), then send the Telegram brief.
+#     Triggered by the in-terminal FULL UPDATE button or "Run workflow".
+#   • news — research price + news only and send the Telegram brief. No commit.
 #
 # Requirements:
 #   - Repo secret `matrix` holding an OpenAI API key (exposed as OPENAI_API_KEY).
-#   - Scheduled runs only fire from the repo's DEFAULT branch. The in-terminal
-#     button dispatches this workflow on whatever branch it targets; that branch
-#     must carry this workflow file (with the `mode` input below).
 
 on:
-  schedule:
-    - cron: "30 12 * * 1-5"   # 08:30 ET while on EDT (1h before the 09:30 open)
-    - cron: "30 13 * * 1-5"   # 08:30 ET while on EST (1h before the 09:30 open)
   workflow_dispatch:
     inputs:
       mode:
@@ -36,31 +27,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Decide whether to run and in which mode. Scheduled runs are always `news`
-  # (and only the one landing on 08:30 New York proceeds). Manual runs use the
-  # chosen input (default full).
-  gate:
-    runs-on: ubuntu-latest
-    outputs:
-      go: ${{ steps.check.outputs.go }}
-      mode: ${{ steps.check.outputs.mode }}
-    steps:
-      - id: check
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "go=true" >> "$GITHUB_OUTPUT"
-            echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
-          elif [ "$(TZ=America/New_York date +%H)" = "08" ]; then
-            echo "go=true" >> "$GITHUB_OUTPUT"
-            echo "mode=news" >> "$GITHUB_OUTPUT"
-          else
-            echo "go=false (skipping: not 08:30 New York time)"
-            echo "go=false" >> "$GITHUB_OUTPUT"
-          fi
-
   update:
-    needs: gate
-    if: needs.gate.outputs.go == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -75,12 +42,12 @@ jobs:
       - name: Research latest signals
         env:
           OPENAI_API_KEY: ${{ secrets.matrix }}
-          SIGNAL_MODE: ${{ needs.gate.outputs.mode }}
+          SIGNAL_MODE: ${{ inputs.mode }}
         run: node scripts/update-signals.mjs
 
-      # Only a FULL update changes the site; the daily news run is Telegram-only.
+      # Only a FULL update changes the site; a news run is Telegram-only.
       - name: Commit refreshed data
-        if: needs.gate.outputs.mode == 'full'
+        if: inputs.mode == 'full'
         run: |
           git config user.name "matrix-signal-bot"
           git config user.email "github-actions[bot]@users.noreply.github.com"
