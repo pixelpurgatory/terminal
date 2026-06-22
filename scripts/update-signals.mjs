@@ -205,9 +205,9 @@ const isAccessError = (msg) =>
 async function researchOne(client, candidates, sym, mode) {
   const input = buildPrompt(sym, mode);
   // max_output_tokens is a CAP, not a charge — billing is per token actually
-  // produced. news runs reasoning "high", which consumes a lot of the budget, so
-  // give it real headroom or the visible JSON gets starved/truncated.
-  const maxTokens = mode === "news" ? 10000 : 12000;
+  // produced. news runs reasoning "high", which burns a LOT of the budget, so
+  // give it big headroom or the visible JSON gets starved → "empty output".
+  const maxTokens = mode === "news" ? 20000 : 12000;
   // Per-mode reasoning effort: news = "high" (small payload, deeper read of the
   // headlines); full = "low" (cheaper + lighter on TPM for heavy signal calls).
   const effort = mode === "news" ? "high" : "low";
